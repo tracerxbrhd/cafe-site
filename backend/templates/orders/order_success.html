@@ -2,25 +2,27 @@
 {% block title %}Заказ принят — Сказка{% endblock %}
 
 {% block content %}
-<div style="max-width:720px;border:1px solid #ddd;border-radius:10px;padding:16px;">
-  <h1 style="margin-top:0;">Заказ принят</h1>
+<div class="panel" style="max-width:760px;">
+  <h1 class="section-title" style="margin-bottom:12px;">Заказ принят</h1>
 
-  <p>Спасибо. Заказ <b>№{{ order.id }}</b> успешно создан.</p>
+  <p style="margin-top:0;">
+    Спасибо. Заказ <b>№{{ order.id }}</b> успешно создан.
+  </p>
 
-  <div style="display:grid;gap:8px;margin:16px 0;">
-    <div><b>Статус:</b> {{ order.get_status_display }}</div>
+  <div class="status-box" style="margin:16px 0;">
+    <div><b>Статус:</b> <span class="status-badge">{{ order.get_status_display }}</span></div>
     <div><b>Способ получения:</b> {{ order.get_fulfillment_display }}</div>
     <div><b>Телефон:</b> {{ order.customer_phone }}</div>
     <div><b>Итого:</b> {{ order.total }} ₽</div>
   </div>
 
-  <div style="margin:16px 0;padding:12px;border:1px dashed #bbb;border-radius:8px;">
-    Сохраните ссылку на страницу статуса заказа. По ней можно отслеживать изменения статуса без входа в аккаунт.
+  <div class="notice-box" style="margin:18px 0;">
+    Сохрани ссылку на страницу статуса заказа. По ней можно отслеживать изменения статуса без входа в аккаунт.
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;">
-    <a href="{% url 'orders:order_status' public_id=order.public_id %}">Открыть статус заказа</a>
-    <a href="{% url 'catalog:index' %}">Вернуться в каталог</a>
+    <a href="{% url 'orders:order_status' public_id=order.public_id %}" class="btn btn-primary">Открыть статус заказа</a>
+    <a href="{% url 'catalog:index' %}" class="btn-link">Вернуться в каталог</a>
   </div>
 </div>
 {% endblock %}

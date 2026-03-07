@@ -61,7 +61,13 @@ def cart_lines(session) -> Tuple[List[CartLine], Decimal]:
         return [], Decimal("0.00")
 
     ids = [int(pid) for pid in cart.keys()]
-    products = {p.id: p for p in Product.objects.filter(id__in=ids, is_active=True).select_related("category")}
+    # products = {p.id: p for p in Product.objects.filter(id__in=ids, is_active=True).select_related("category")}
+    products = {
+        p.id: p
+        for p in Product.objects.filter(id__in=ids, is_active=True)
+        .select_related("category")
+        .prefetch_related("images")
+    }
 
     lines: List[CartLine] = []
     total = Decimal("0.00")

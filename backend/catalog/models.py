@@ -33,9 +33,22 @@ class Product(models.Model):
 
     @property
     def main_image(self):
+        prefetched = getattr(self, "_prefetched_objects_cache", {})
+        images = prefetched.get("images")
+
+        if images is not None:
+            images = sorted(images, key=lambda img: (img.sort_order, img.id))
+
+            for img in images:
+                if img.is_main:
+                    return img
+
+            return images[0] if images else None
+
         main = self.images.filter(is_main=True).order_by("sort_order", "id").first()
         if main:
             return main
+
         return self.images.order_by("sort_order", "id").first()
 
     class Meta:
@@ -47,17 +60,48 @@ class Product(models.Model):
         return self.name
 
 
+# class ProductImage(models.Model):
+#     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="images", verbose_name="Блюдо")
+#     image = models.ImageField("Изображение", upload_to="products/")
+#     alt_text = models.CharField("Alt", max_length=200, blank=True)
+#     is_main = models.BooleanField("Главное", default=False)
+#     sort_order = models.PositiveIntegerField("Сортировка", default=100)
+
+#     class Meta:
+#         verbose_name = "Фото блюда"
+#         verbose_name_plural = "Фото блюд"
+#         ordering = ["sort_order", "id"]
+
+#     def __str__(self) -> str:
+#         return f"{self.product_id} image #{self.id}"
 class ProductImage(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="images", verbose_name="Блюдо")
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="images",
+        verbose_name="Товар",
+    )
+
     image = models.ImageField("Изображение", upload_to="products/")
-    alt_text = models.CharField("Alt", max_length=200, blank=True)
-    is_main = models.BooleanField("Главное", default=False)
+    alt_text = models.CharField("Alt текст", max_length=255, blank=True)
+
+    is_main = models.BooleanField("Главное изображение", default=False)
+
     sort_order = models.PositiveIntegerField("Сортировка", default=100)
 
+    created_at = models.DateTimeField(auto_now_add=True)
+
     class Meta:
-        verbose_name = "Фото блюда"
-        verbose_name_plural = "Фото блюд"
         ordering = ["sort_order", "id"]
 
-    def __str__(self) -> str:
-        return f"{self.product_id} image #{self.id}"
+    def __str__(self):
+        return f"{self.product.name} image"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if self.is_main:
+            ProductImage.objects.filter(
+                product=self.product,
+                is_main=True
+            ).exclude(id=self.id).update(is_main=False)

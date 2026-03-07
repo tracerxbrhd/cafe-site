@@ -2,37 +2,40 @@
 {% block title %}Корзина — Сказка{% endblock %}
 
 {% block content %}
-  <h1 style="margin:0 0 16px;">Корзина</h1>
+  <h1 class="section-title">Корзина</h1>
 
   {% if not lines %}
-    <div style="border:1px solid #ddd;border-radius:14px;padding:24px;max-width:620px;">
+    <div class="card empty-state">
       <div style="font-size:22px;font-weight:700;margin-bottom:8px;">Корзина пуста</div>
-      <div style="opacity:.75;margin-bottom:16px;">
+      <div class="muted" style="margin-bottom:16px;">
         Добавь блюда из каталога, и они появятся здесь.
       </div>
-      <a href="{% url 'catalog:index' %}">Перейти в каталог</a>
+      <a href="{% url 'catalog:index' %}" class="btn-link">Перейти в каталог</a>
     </div>
   {% else %}
-    <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;">
-      <div style="display:grid;gap:12px;">
+    <div class="cart-layout">
+      <div class="cart-items">
         {% for line in lines %}
-          <div style="border:1px solid #ddd;border-radius:14px;padding:14px;display:flex;justify-content:space-between;gap:16px;align-items:center;">
-            <div style="display:flex;gap:14px;align-items:center;">
+          <div
+            class="card cart-row"
+            data-cart-row
+          >
+            <div class="cart-row-left">
               {% if line.product.main_image %}
                 <img
                   src="{{ line.product.main_image.image.url }}"
                   alt="{{ line.product.name }}"
-                  style="width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid #eee;"
+                  class="cart-row-image"
                 />
               {% else %}
-                <div style="width:84px;height:84px;border-radius:10px;border:1px solid #eee;background:#f3f3f3;display:flex;align-items:center;justify-content:center;opacity:.55;">
+                <div class="cart-row-image" style="display:flex;align-items:center;justify-content:center;opacity:.55;">
                   Нет фото
                 </div>
               {% endif %}
 
               <div>
-                <div style="font-size:18px;font-weight:600;margin-bottom:4px;">{{ line.product.name }}</div>
-                <div style="opacity:.65;font-size:13px;">{{ line.product.category.name }}</div>
+                <div style="font-size:18px;font-weight:700;margin-bottom:4px;">{{ line.product.name }}</div>
+                <div class="muted" style="font-size:13px;">{{ line.product.category.name }}</div>
 
                 <div style="margin-top:8px;">
                   {{ line.product.price }} ₽ ×
@@ -43,28 +46,39 @@
               </div>
             </div>
 
-            <div style="display:flex;align-items:center;gap:8px;">
-              <button type="button" data-cart-action="dec" data-product-id="{{ line.product.id }}" style="width:34px;height:34px;">−</button>
-              <button type="button" data-cart-action="add" data-product-id="{{ line.product.id }}" style="width:34px;height:34px;">+</button>
+            <div class="qty-controls">
+              <button
+                type="button"
+                data-cart-action="dec"
+                data-product-id="{{ line.product.id }}"
+                class="btn-icon"
+              >−</button>
+
+              <button
+                type="button"
+                data-cart-action="add"
+                data-product-id="{{ line.product.id }}"
+                class="btn-icon"
+              >+</button>
             </div>
           </div>
         {% endfor %}
       </div>
 
-      <aside style="border:1px solid #ddd;border-radius:14px;padding:16px;position:sticky;top:16px;">
-        <div style="font-size:20px;font-weight:700;margin-bottom:12px;">Ваш заказ</div>
+      <aside class="card cart-summary">
+        <div class="cart-summary-title">Ваш заказ</div>
 
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <div style="opacity:.75;">Итого</div>
-          <div style="font-size:22px;font-weight:700;">
+        <div class="cart-summary-total">
+          <div class="muted">Итого</div>
+          <div style="font-size:24px;font-weight:700;">
             <span id="cart-total">{{ total }}</span> ₽
           </div>
         </div>
 
         <div style="display:grid;gap:10px;">
-          <a href="{% url 'orders:checkout' %}" style="display:inline-block;">Оформить заказ</a>
-          <button type="button" data-cart-action="clear">Очистить корзину</button>
-          <a href="{% url 'catalog:index' %}">Продолжить выбор</a>
+          <a href="{% url 'orders:checkout' %}" class="btn btn-primary">Оформить заказ</a>
+          <button type="button" data-cart-action="clear" class="btn">Очистить корзину</button>
+          <a href="{% url 'catalog:index' %}" class="btn-link">Продолжить выбор</a>
         </div>
       </aside>
     </div>

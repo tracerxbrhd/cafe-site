@@ -2,96 +2,102 @@
 {% block title %}Оформление — Сказка{% endblock %}
 
 {% block content %}
-<h1 style="margin:0 0 12px;">Оформление заказа</h1>
+<h1 class="section-title">Оформление заказа</h1>
 
-<div style="display:grid;grid-template-columns:1fr;gap:16px;max-width:760px;">
-  <form method="post" id="checkout-form" style="border:1px solid #ddd;border-radius:10px;padding:12px;">
+<div class="page-grid">
+  <form method="post" id="checkout-form" class="panel">
     {% csrf_token %}
 
+    <h2 class="panel-title">Контактные данные</h2>
+
     {% if form.non_field_errors %}
-      <div style="color:#b00;margin-bottom:10px;">
+      <div class="form-error" style="margin-bottom:10px;">
         {{ form.non_field_errors }}
       </div>
     {% endif %}
 
-    <div style="display:grid;gap:10px;">
-      <label>
-        Способ получения<br/>
+    <div class="form-grid">
+      <div class="form-row">
+        <label class="form-label" for="{{ form.fulfillment.id_for_label }}">Способ получения</label>
         {{ form.fulfillment }}
-      </label>
-      {% if form.fulfillment.errors %}
-        <div style="color:#b00;">{{ form.fulfillment.errors }}</div>
-      {% endif %}
-
-      <label>
-        Имя<br/>
-        {{ form.customer_name }}
-      </label>
-      {% if form.customer_name.errors %}
-        <div style="color:#b00;">{{ form.customer_name.errors }}</div>
-      {% endif %}
-
-      <label>
-        Телефон<br/>
-        {{ form.customer_phone }}
-      </label>
-      {% if form.customer_phone.errors %}
-        <div style="color:#b00;">{{ form.customer_phone.errors }}</div>
-      {% endif %}
-
-      <div id="delivery-fields" style="display:grid;gap:10px;">
-        <hr style="border:none;border-top:1px solid #eee;"/>
-
-        <label>
-          Адрес<br/>
-          {{ form.address_line }}
-        </label>
-        {% if form.address_line.errors %}
-          <div style="color:#b00;">{{ form.address_line.errors }}</div>
+        {% if form.fulfillment.errors %}
+          <div class="form-error">{{ form.fulfillment.errors }}</div>
         {% endif %}
+      </div>
 
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-          <label>
-            Подъезд<br/>
+      <div class="form-row">
+        <label class="form-label" for="{{ form.customer_name.id_for_label }}">Имя</label>
+        {{ form.customer_name }}
+        {% if form.customer_name.errors %}
+          <div class="form-error">{{ form.customer_name.errors }}</div>
+        {% endif %}
+      </div>
+
+      <div class="form-row">
+        <label class="form-label" for="{{ form.customer_phone.id_for_label }}">Телефон</label>
+        {{ form.customer_phone }}
+        <div class="form-hint">Формат: +7 (900) 123-45-67</div>
+        {% if form.customer_phone.errors %}
+          <div class="form-error">{{ form.customer_phone.errors }}</div>
+        {% endif %}
+      </div>
+
+      <div id="delivery-fields" style="display:grid;gap:12px;">
+        <div class="form-row">
+          <label class="form-label" for="{{ form.address_line.id_for_label }}">Адрес доставки</label>
+          {{ form.address_line }}
+          {% if form.address_line.errors %}
+            <div class="form-error">{{ form.address_line.errors }}</div>
+          {% endif %}
+        </div>
+
+        <div class="form-row-3">
+          <div class="form-row">
+            <label class="form-label" for="{{ form.address_entrance.id_for_label }}">Подъезд</label>
             {{ form.address_entrance }}
-          </label>
-          <label>
-            Этаж<br/>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label" for="{{ form.address_floor.id_for_label }}">Этаж</label>
             {{ form.address_floor }}
-          </label>
-          <label>
-            Квартира/офис<br/>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label" for="{{ form.address_apartment.id_for_label }}">Квартира / офис</label>
             {{ form.address_apartment }}
-          </label>
+          </div>
         </div>
       </div>
 
-      <label>
-        Комментарий<br/>
+      <div class="form-row">
+        <label class="form-label" for="{{ form.customer_comment.id_for_label }}">Комментарий</label>
         {{ form.customer_comment }}
-      </label>
-
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:12px;flex-wrap:wrap;">
-        <div style="font-size:18px;font-weight:600;">Итого: {{ total }} ₽</div>
-        <div style="display:flex;gap:10px;">
-          <a href="{% url 'orders:cart' %}">Вернуться в корзину</a>
-          <button type="submit">Подтвердить заказ</button>
-        </div>
       </div>
     </div>
   </form>
 
-  <div style="border:1px solid #ddd;border-radius:10px;padding:12px;">
-    <div style="font-weight:600;margin-bottom:8px;">Состав заказа</div>
-    <div style="display:grid;gap:6px;">
+  <aside class="panel">
+    <h2 class="panel-title">Ваш заказ</h2>
+
+    <div class="order-lines">
       {% for line in lines %}
-        <div style="display:flex;justify-content:space-between;gap:12px;">
+        <div class="order-line">
           <div>{{ line.product.name }} × {{ line.qty }}</div>
           <div>{{ line.line_total }} ₽</div>
         </div>
       {% endfor %}
     </div>
-  </div>
+
+    <div class="order-total-row">
+      <div class="muted">Итого</div>
+      <div style="font-size:24px;font-weight:700;">{{ total }} ₽</div>
+    </div>
+
+    <div style="display:grid;gap:10px;margin-top:16px;">
+      <button type="submit" form="checkout-form" class="btn btn-primary">Подтвердить заказ</button>
+      <a href="{% url 'orders:cart' %}" class="btn-link">Вернуться в корзину</a>
+    </div>
+  </aside>
 </div>
 
 <script>
@@ -133,21 +139,11 @@
     let result = "+7";
     const rest = digits.slice(1);
 
-    if (rest.length > 0) {
-      result += " (" + rest.slice(0, 3);
-    }
-    if (rest.length >= 3) {
-      result += ")";
-    }
-    if (rest.length > 3) {
-      result += " " + rest.slice(3, 6);
-    }
-    if (rest.length > 6) {
-      result += "-" + rest.slice(6, 8);
-    }
-    if (rest.length > 8) {
-      result += "-" + rest.slice(8, 10);
-    }
+    if (rest.length > 0) result += " (" + rest.slice(0, 3);
+    if (rest.length >= 3) result += ")";
+    if (rest.length > 3) result += " " + rest.slice(3, 6);
+    if (rest.length > 6) result += "-" + rest.slice(6, 8);
+    if (rest.length > 8) result += "-" + rest.slice(8, 10);
 
     return result;
   }
