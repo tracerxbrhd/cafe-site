@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Статус заказа #{{ order.id }} — Сказка{% endblock %}
+
+{% block content %}
+<h1 style="margin:0 0 12px;">Заказ #{{ order.id }}</h1>
+
+<div id="order-box" data-public-id="{{ order.public_id }}" style="border:1px solid #ddd;border-radius:10px;padding:12px;max-width:720px;">
+  <div><b>Статус:</b> <span id="order-status">{{ order.get_status_display }}</span></div>
+  <div><b>Способ:</b> {{ order.get_fulfillment_display }}</div>
+  <div><b>Итого:</b> <span id="order-total">{{ order.total }}</span> ₽</div>
+  <div style="opacity:.7;margin-top:8px;">Обновлено: <span id="order-updated">{{ order.updated_at }}</span></div>
+  <div style="opacity:.7;margin-top:8px;">Автообновление: <span id="order-poll">включено</span></div>
+</div>
+
+<script>
+(async function() {
+  const box = document.getElementById("order-box");
+  if (!box) return;
+
+  const publicId = box.getAttribute("data-public-id");
+
+  const statusEl = document.getElementById("order-status");
+  const totalEl = document.getElementById("order-total");
+  const updEl = document.getElementById("order-updated");
+  const pollEl = document.getElementById("order-poll");
+
+  async function tick() {
+    const url = "{% url 'orders:api_order_status' '00000000-0000-0000-0000-000000000000' %}"
+      .replace("00000000-0000-0000-0000-000000000000", publicId);
+
+    const resp = await fetch(url, {credentials: "same-origin"});
+    if (!resp.ok) throw new Error("status fetch failed");
+    const data = await resp.json();
+
+    if (statusEl) statusEl.textContent = data.status_label;
+    if (totalEl) totalEl.textContent = data.total;
+    if (updEl) updEl.textContent = data.updated_at;
+
+    const terminal = new Set(["done", "canceled"]);
+    if (terminal.has(data.status)) {
+      if (pollEl) pollEl.textContent = "остановлено";
+      return false;
+    }
+    if (pollEl) pollEl.textContent = "включено";
+    return true;
+  }
+
+  async function loop() {
+    try {
+      const cont = await tick();
+      if (cont === false) return;
+    } catch (e) {
+      if (pollEl) pollEl.textContent = "ошибка (повторяем)";
+    }
+    setTimeout(loop, 5000);
+  }
+
+  loop();
+})();
+</script>
+{% endblock %}

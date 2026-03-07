@@ -1,0 +1,583 @@
+{% extends "base.html" %}
+{% load dicts %}
+{% block title %}Сказка{% endblock %}
+
+{% block content %}
+  <section style="margin-bottom:28px;">
+  {% if banners %}
+    <style>
+      #promo-slider {
+        position: relative;
+        border: 1px solid #ddd;
+        border-radius: 18px;
+        overflow: hidden;
+        background: #f5f5f5;
+      }
+
+      .promo-slides {
+        position: relative;
+        min-height: 320px;
+      }
+
+      .promo-slide {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        visibility: hidden;
+        transform: scale(1.01);
+        transition:
+          opacity .45s ease-in-out,
+          visibility .45s ease-in-out,
+          transform .45s ease-in-out;
+        pointer-events: none;
+      }
+
+      .promo-slide.is-active {
+        opacity: 1;
+        visibility: visible;
+        transform: scale(1);
+        pointer-events: auto;
+        z-index: 1;
+      }
+
+      .promo-slide-bg {
+        position: absolute;
+        inset: 0;
+      }
+
+      .promo-slide-bg img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .promo-slide-overlay {
+        position: relative;
+        z-index: 1;
+        min-height: 320px;
+        display: flex;
+        align-items: center;
+        padding: 28px;
+        background: linear-gradient(
+          90deg,
+          rgba(0, 0, 0, .58) 0%,
+          rgba(0, 0, 0, .24) 45%,
+          rgba(0, 0, 0, .08) 100%
+        );
+      }
+
+      .promo-slide-content {
+        max-width: 560px;
+        color: #fff;
+      }
+
+      .promo-slide-title {
+        font-size: 34px;
+        font-weight: 700;
+        line-height: 1.2;
+        margin-bottom: 12px;
+      }
+
+      .promo-slide-subtitle {
+        font-size: 16px;
+        line-height: 1.5;
+        opacity: .95;
+        margin-bottom: 16px;
+      }
+
+      .promo-slide-btn {
+        display: inline-block;
+        padding: 10px 16px;
+        border-radius: 10px;
+        background: #fff;
+        color: #111;
+        text-decoration: none;
+        font-weight: 600;
+      }
+
+      .promo-nav-btn {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 3;
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,.35);
+        background: rgba(0,0,0,.35);
+        color: #fff;
+        cursor: pointer;
+      }
+
+      .promo-nav-btn:hover {
+        background: rgba(0,0,0,.5);
+      }
+
+      #promo-prev { left: 12px; }
+      #promo-next { right: 12px; }
+
+      #promo-dots {
+        position: absolute;
+        left: 50%;
+        bottom: 14px;
+        transform: translateX(-50%);
+        z-index: 3;
+        display: flex;
+        gap: 8px;
+      }
+
+      .promo-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        border: none;
+        background: rgba(255,255,255,.45);
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .promo-dot.is-active {
+        background: #fff;
+      }
+
+      @media (max-width: 768px) {
+        .promo-slides,
+        .promo-slide-overlay {
+          min-height: 260px;
+        }
+
+        .promo-slide-title {
+          font-size: 26px;
+        }
+
+        .promo-slide-subtitle {
+          font-size: 14px;
+        }
+      }
+    </style>
+
+    <div
+      id="promo-slider"
+      data-autoplay="true"
+      data-autoplay-delay="5000"
+      aria-label="Промо-баннеры"
+    >
+      <div class="promo-slides">
+        {% for banner in banners %}
+          <div
+            class="promo-slide {% if forloop.first %}is-active{% endif %}"
+            data-slide-index="{{ forloop.counter0 }}"
+            aria-hidden="{% if forloop.first %}false{% else %}true{% endif %}"
+          >
+            <div class="promo-slide-bg">
+              <img
+                src="{{ banner.image.url }}"
+                alt="{{ banner.title }}"
+              />
+            </div>
+
+            <div class="promo-slide-overlay">
+              <div class="promo-slide-content">
+                <div class="promo-slide-title">
+                  {{ banner.title }}
+                </div>
+
+                {% if banner.subtitle %}
+                  <div class="promo-slide-subtitle">
+                    {{ banner.subtitle|linebreaksbr }}
+                  </div>
+                {% endif %}
+
+                {% if banner.button_text and banner.button_url %}
+                  <a
+                    href="{{ banner.button_url }}"
+                    class="promo-slide-btn"
+                  >
+                    {{ banner.button_text }}
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if banners|length > 1 %}
+        <button
+          type="button"
+          id="promo-prev"
+          class="promo-nav-btn"
+          aria-label="Предыдущий баннер"
+        >
+          ←
+        </button>
+
+        <button
+          type="button"
+          id="promo-next"
+          class="promo-nav-btn"
+          aria-label="Следующий баннер"
+        >
+          →
+        </button>
+
+        <div id="promo-dots" aria-label="Навигация по баннерам">
+          {% for banner in banners %}
+            <button
+              type="button"
+              class="promo-dot {% if forloop.first %}is-active{% endif %}"
+              data-dot-index="{{ forloop.counter0 }}"
+              aria-label="Баннер {{ forloop.counter }}"
+            ></button>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  {% else %}
+    <div style="border:1px solid #ddd;border-radius:18px;overflow:hidden;background:#f5f5f5;min-height:260px;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="text-align:center;max-width:700px;">
+        <div style="font-size:32px;font-weight:700;margin-bottom:12px;">Слайдер / акции / баннеры</div>
+        <div style="opacity:.75;line-height:1.5;">
+          Здесь позже можно разместить акции, сезонные предложения, важные уведомления и рекламные баннеры.
+        </div>
+      </div>
+    </div>
+  {% endif %}
+  </section>
+
+  <section>
+    <div style="display:flex;align-items:end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;">
+      <div>
+        <h1 style="margin:0 0 8px;">Меню</h1>
+        <div style="opacity:.75;">Выбери категорию и смотри превью товаров</div>
+      </div>
+    </div>
+
+    {% if not preview_sections %}
+      <div style="border:1px solid #ddd;border-radius:12px;padding:20px;">
+        <div style="font-size:20px;font-weight:600;margin-bottom:8px;">Пока нет доступных блюд</div>
+        <div style="opacity:.75;">Добавь товары в админке, и они появятся здесь.</div>
+      </div>
+    {% else %}
+      <div id="category-filters" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;">
+        <button
+          type="button"
+          data-category-filter="all"
+          data-category-url=""
+          style="padding:8px 12px;border:1px solid #ddd;border-radius:999px;background:#111;color:#fff;"
+        >
+          Все
+        </button>
+
+        {% for category in categories %}
+          <button
+            type="button"
+            data-category-filter="{{ category.slug }}"
+            data-category-url="{% url 'catalog:category_detail' category.slug %}"
+            style="padding:8px 12px;border:1px solid #ddd;border-radius:999px;background:#fff;color:#111;"
+          >
+            {{ category.name }}
+          </button>
+        {% endfor %}
+      </div>
+
+      <div id="preview-sections" style="display:grid;gap:32px;transition:opacity .25s ease-in-out, transform .25s ease-in-out;">
+        {% for section in preview_sections %}
+          <section
+            data-category-slug="{{ section.category.slug }}"
+            style="transition:opacity .25s ease-in-out, transform .25s ease-in-out;"
+          >
+            <div style="display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+              <div>
+                <h2 style="margin:0 0 4px;">{{ section.category.name }}</h2>
+                <div style="opacity:.65;font-size:13px;">
+                  Показано {{ section.products|length }} из {{ section.total_products }}
+                </div>
+              </div>
+
+              <a href="{% url 'catalog:category_detail' section.category.slug %}">
+                Смотреть все
+              </a>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;">
+              {% for p in section.products %}
+                <article style="border:1px solid #ddd;border-radius:14px;overflow:hidden;background:#fff;display:flex;flex-direction:column;">
+                  <a href="{% url 'catalog:product_detail' p.slug %}" style="display:block;text-decoration:none;color:inherit;">
+                    {% if p.main_image %}
+                      <div style="aspect-ratio:1/1;background:#f3f3f3;">
+                        <img
+                          src="{{ p.main_image.image.url }}"
+                          alt="{{ p.main_image.alt_text|default:p.name }}"
+                          style="width:100%;height:100%;object-fit:cover;display:block;"
+                        />
+                      </div>
+                    {% else %}
+                      <div style="aspect-ratio:1/1;background:#f3f3f3;display:flex;align-items:center;justify-content:center;opacity:.55;">
+                        Нет фото
+                      </div>
+                    {% endif %}
+                  </a>
+
+                  <div style="padding:14px;display:flex;flex-direction:column;gap:10px;flex:1;">
+                    <div style="font-size:12px;opacity:.65;">{{ section.category.name }}</div>
+
+                    <div style="font-size:18px;font-weight:600;line-height:1.3;">
+                      <a href="{% url 'catalog:product_detail' p.slug %}" style="text-decoration:none;color:inherit;">
+                        {{ p.name }}
+                      </a>
+                    </div>
+
+                    {% if p.description %}
+                      <div style="font-size:14px;opacity:.8;line-height:1.4;">
+                        {{ p.description|truncatechars:110 }}
+                      </div>
+                    {% endif %}
+
+                    <div style="margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                      <div>
+                        <div style="font-size:20px;font-weight:700;">{{ p.price }} ₽</div>
+                        {% if p.weight_grams %}
+                          <div style="font-size:12px;opacity:.65;">{{ p.weight_grams }} г</div>
+                        {% endif %}
+                      </div>
+
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        {% with q=cart_map|get_item:p.id %}
+                          <button
+                            type="button"
+                            data-cart-action="dec"
+                            data-product-id="{{ p.id }}"
+                            {% if not q %}disabled{% endif %}
+                            style="width:32px;height:32px;"
+                          >−</button>
+
+                          <span data-qty="{{ p.id }}" style="min-width:24px;text-align:center;font-weight:600;">
+                            {{ q|default:0 }}
+                          </span>
+
+                          <button
+                            type="button"
+                            data-cart-action="add"
+                            data-product-id="{{ p.id }}"
+                            style="width:32px;height:32px;"
+                          >+</button>
+                        {% endwith %}
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          </section>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+
+  <script>
+    (function() {
+      const filtersWrap = document.getElementById("category-filters");
+      const sectionsWrap = document.getElementById("preview-sections");
+      const moreLink = document.getElementById("category-more-link");
+      if (!filtersWrap || !sectionsWrap) return;
+
+      const buttons = Array.from(filtersWrap.querySelectorAll("[data-category-filter]"));
+      const sections = Array.from(sectionsWrap.querySelectorAll("[data-category-slug]"));
+
+      function setActiveButton(activeSlug) {
+        buttons.forEach((btn) => {
+          const isActive = btn.getAttribute("data-category-filter") === activeSlug;
+          btn.style.background = isActive ? "#111" : "#fff";
+          btn.style.color = isActive ? "#fff" : "#111";
+        });
+      }
+
+      function updateMoreLink(activeSlug) {
+        if (!moreLink) return;
+
+        if (activeSlug === "all") {
+          moreLink.style.display = "none";
+          moreLink.setAttribute("href", "#");
+          return;
+        }
+
+        const activeBtn = filtersWrap.querySelector(`[data-category-filter="${activeSlug}"]`);
+        const url = activeBtn ? activeBtn.getAttribute("data-category-url") : "";
+
+        if (url) {
+          moreLink.style.display = "inline";
+          moreLink.setAttribute("href", url);
+          moreLink.textContent = "Смотреть все";
+        } else {
+          moreLink.style.display = "none";
+          moreLink.setAttribute("href", "#");
+        }
+      }
+
+      function showSections(activeSlug) {
+        sectionsWrap.style.opacity = "0";
+        sectionsWrap.style.transform = "translateY(6px)";
+
+        setTimeout(() => {
+          sections.forEach((section) => {
+            const slug = section.getAttribute("data-category-slug");
+            const visible = activeSlug === "all" || slug === activeSlug;
+            section.style.display = visible ? "block" : "none";
+          });
+
+          setActiveButton(activeSlug);
+          updateMoreLink(activeSlug);
+
+          sectionsWrap.style.opacity = "1";
+          sectionsWrap.style.transform = "translateY(0)";
+        }, 180);
+      }
+
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const slug = btn.getAttribute("data-category-filter") || "all";
+          showSections(slug);
+        });
+      });
+
+      showSections("all");
+    })();
+  </script>
+  <script>
+  (function() {
+    const slider = document.getElementById("promo-slider");
+    if (!slider) return;
+
+    const slides = Array.from(slider.querySelectorAll(".promo-slide"));
+    if (slides.length <= 1) return;
+
+    const prevBtn = document.getElementById("promo-prev");
+    const nextBtn = document.getElementById("promo-next");
+    const dots = Array.from(slider.querySelectorAll("[data-dot-index]"));
+
+    const autoplayEnabled = slider.getAttribute("data-autoplay") === "true";
+    const autoplayDelay = Number(slider.getAttribute("data-autoplay-delay") || 5000);
+
+    let current = 0;
+    let autoplayTimer = null;
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let isHovered = false;
+
+    function renderSlide(index) {
+      slides.forEach((slide, i) => {
+        const active = i === index;
+        slide.classList.toggle("is-active", active);
+        slide.setAttribute("aria-hidden", active ? "false" : "true");
+      });
+
+      dots.forEach((dot, i) => {
+        dot.classList.toggle("is-active", i === index);
+      });
+    }
+
+    function goTo(index) {
+      if (index < 0) index = slides.length - 1;
+      if (index >= slides.length) index = 0;
+      current = index;
+      renderSlide(current);
+    }
+
+    function next() {
+      goTo(current + 1);
+    }
+
+    function prev() {
+      goTo(current - 1);
+    }
+
+    function stopAutoplay() {
+      if (autoplayTimer) {
+        clearInterval(autoplayTimer);
+        autoplayTimer = null;
+      }
+    }
+
+    function startAutoplay() {
+      if (!autoplayEnabled) return;
+      stopAutoplay();
+
+      autoplayTimer = setInterval(() => {
+        if (!isHovered) {
+          next();
+        }
+      }, autoplayDelay);
+    }
+
+    if (prevBtn) {
+      prevBtn.addEventListener("click", () => {
+        prev();
+        startAutoplay();
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => {
+        next();
+        startAutoplay();
+      });
+    }
+
+    dots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        const idx = Number(dot.getAttribute("data-dot-index"));
+        goTo(idx);
+        startAutoplay();
+      });
+    });
+
+    slider.addEventListener("mouseenter", () => {
+      isHovered = true;
+    });
+
+    slider.addEventListener("mouseleave", () => {
+      isHovered = false;
+    });
+
+    slider.addEventListener("touchstart", (e) => {
+      if (!e.touches || !e.touches.length) return;
+      touchStartX = e.touches[0].clientX;
+      touchEndX = touchStartX;
+    }, { passive: true });
+
+    slider.addEventListener("touchmove", (e) => {
+      if (!e.touches || !e.touches.length) return;
+      touchEndX = e.touches[0].clientX;
+    }, { passive: true });
+
+    slider.addEventListener("touchend", () => {
+      const delta = touchEndX - touchStartX;
+
+      if (Math.abs(delta) > 50) {
+        if (delta < 0) {
+          next();
+        } else {
+          prev();
+        }
+        startAutoplay();
+      }
+
+      touchStartX = 0;
+      touchEndX = 0;
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        stopAutoplay();
+      } else {
+        startAutoplay();
+      }
+    });
+
+    renderSlide(current);
+    startAutoplay();
+  })();
+  </script>
+{% endblock %}

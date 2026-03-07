@@ -1,0 +1,19 @@
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# env
+.env
+
+# django
+media/
+staticfiles/
+
+# vscode / ide
+.vscode/
+.idea/
+
+# misc
+.DS_Store

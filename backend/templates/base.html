@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Сказка{% endblock %}</title>
+</head>
+<body>
+  <form style="display:none">{% csrf_token %}</form>
+  <header style="display:flex;gap:16px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #ddd;">
+    <a href="{% url 'catalog:index' %}">Кафе «Сказка»</a>
+    <nav style="display:flex;gap:12px;align-items:center;">
+      <a href="{% url 'orders:cart' %}">
+        Корзина: <span id="cart-count">{{ cart_count }}</span>
+      </a>
+    </nav>
+  </header>
+
+  <main style="max-width:1100px;margin:0 auto;padding:16px;">
+    {% block content %}{% endblock %}
+  </main>
+
+<script>
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+
+async function postForm(url, data) {
+  const form = new URLSearchParams();
+  for (const [k, v] of Object.entries(data)) form.append(k, String(v));
+
+  const csrftoken = getCookie("csrftoken");
+
+  const resp = await fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRFToken": csrftoken ?? "",
+    },
+    body: form.toString()
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`HTTP ${resp.status}: ${text}`);
+  }
+  return await resp.json();
+}
+
+function setCartCount(count) {
+  const el = document.getElementById("cart-count");
+  if (el) el.textContent = String(count);
+}
+async function refreshCartPage() {
+  const totalEl = document.getElementById("cart-total");
+  if (!totalEl) return; // мы не на странице корзины
+
+  const resp = await fetch("{% url 'orders:api_summary' %}", {credentials: "same-origin"});
+  if (!resp.ok) return;
+  const data = await resp.json();
+
+  setCartCount(data.count);
+
+  // total
+  totalEl.textContent = data.total;
+
+  // line qty + totals
+  for (const item of data.items) {
+    const qtyEl = document.querySelector(`[data-qty="${item.product_id}"]`);
+    if (qtyEl) qtyEl.textContent = String(item.qty);
+
+    const ltEl = document.querySelector(`[data-line-total="${item.product_id}"]`);
+    if (ltEl) ltEl.textContent = String(item.line_total);
+  }
+
+  // удаление строк, если qty стала 0 (в summary их уже нет)
+  const presentIds = new Set(data.items.map(i => String(i.product_id)));
+  document.querySelectorAll("[data-qty]").forEach((el) => {
+    const pid = el.getAttribute("data-qty");
+    if (!presentIds.has(pid)) {
+      // удаляем ближайшую карточку строки
+      const row = el.closest("div[style*='border:1px solid']") || el.closest("div");
+      if (row) row.remove();
+    }
+  });
+
+  // если корзина стала пустой — проще перезагрузить страницу (минимальный вариант)
+  if (data.count === 0) {
+    location.reload();
+  }
+}
+
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-cart-action]");
+  if (!btn) return;
+
+  const action = btn.getAttribute("data-cart-action");
+  const productId = btn.getAttribute("data-product-id");
+
+  try {
+    if (action === "add") {
+      const r = await postForm("{% url 'orders:api_add' %}", {product_id: productId, qty_delta: 1});
+      setCartCount(r.count);
+      if (r.product_id != null && r.qty != null) setProductQty(r.product_id, r.qty);
+      await refreshCartPage();
+    } else if (action === "dec") {
+      const r = await postForm("{% url 'orders:api_add' %}", {product_id: productId, qty_delta: -1});
+      setCartCount(r.count);
+      if (r.product_id != null && r.qty != null) setProductQty(r.product_id, r.qty);
+      await refreshCartPage();
+    } else if (action === "clear") {
+      const r = await postForm("{% url 'orders:api_clear' %}", {});
+      setCartCount(r.count);
+      if (r.product_id != null && r.qty != null) setProductQty(r.product_id, r.qty);
+      await refreshCartPage();
+      location.reload();
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Ошибка обновления корзины");
+  }
+});
+
+function setProductQty(productId, qty) {
+  const el = document.querySelector(`[data-qty="${productId}"]`);
+  if (el) el.textContent = String(qty);
+
+  const decBtn = document.querySelector(`[data-cart-action="dec"][data-product-id="${productId}"]`);
+  if (decBtn) decBtn.disabled = !(qty > 0);
+}
+</script>
+</body>
+</html>
