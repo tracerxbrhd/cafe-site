@@ -1,0 +1,288 @@
+{% extends "admin/change_list.html" %}
+
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  #result_list tbody tr.row-status-new td {
+    background: #e8f0fe;
+  }
+
+  #result_list tbody tr.row-status-confirmed td {
+    background: #eef8f0;
+  }
+
+  #result_list tbody tr.row-status-cooking td {
+    background: #fff7ea;
+  }
+
+  #result_list tbody tr.row-status-on_the_way td {
+    background: #eef4ff;
+  }
+
+  #result_list tbody tr.row-status-done td {
+    background: #f7faf7;
+  }
+
+  #result_list tbody tr.row-status-canceled td {
+    background: #fff3f2;
+    color: #666;
+  }
+
+  #result_list tbody tr.row-status-new td:first-child {
+    box-shadow: inset 4px 0 0 #174ea6;
+  }
+
+  #result_list tbody tr.row-status-confirmed td:first-child {
+    box-shadow: inset 4px 0 0 #137333;
+  }
+
+  #result_list tbody tr.row-status-cooking td:first-child {
+    box-shadow: inset 4px 0 0 #b06000;
+  }
+
+  #result_list tbody tr.row-status-on_the_way td:first-child {
+    box-shadow: inset 4px 0 0 #0b57d0;
+  }
+
+  #result_list tbody tr.row-status-canceled td:first-child {
+    box-shadow: inset 4px 0 0 #c5221f;
+  }
+
+  #result_list tbody tr.row-status-new:hover td,
+  #result_list tbody tr.row-status-confirmed:hover td,
+  #result_list tbody tr.row-status-cooking:hover td,
+  #result_list tbody tr.row-status-on_the_way:hover td,
+  #result_list tbody tr.row-status-done:hover td,
+  #result_list tbody tr.row-status-canceled:hover td {
+    filter: brightness(0.985);
+  }
+</style>
+{% endblock %}
+
+
+{% block content_title %}
+{{ block.super }}
+
+{% if order_dashboard %}
+<div style="display:flex;gap:16px;margin-top:16px;margin-bottom:20px;flex-wrap:wrap;">
+
+  <div style="padding:14px 18px;background:#e8f0fe;border-radius:10px;">
+    <b>Новые заказы</b><br>
+    <span id="dash-new" style="font-size:22px;font-weight:700;">{{ order_dashboard.new }}</span>
+  </div>
+
+  <div style="padding:14px 18px;background:#fff4e5;border-radius:10px;">
+    <b>Активные</b><br>
+    <span id="dash-active" style="font-size:22px;font-weight:700;">{{ order_dashboard.active }}</span>
+  </div>
+
+  <div style="padding:14px 18px;background:#e6f4ea;border-radius:10px;">
+    <b>Завершено сегодня</b><br>
+    <span id="dash-done" style="font-size:22px;font-weight:700;">{{ order_dashboard.done_today }}</span>
+  </div>
+
+  <div style="padding:14px 18px;background:#f1f3f4;border-radius:10px;">
+    <b>Выручка сегодня</b><br>
+    <span id="dash-revenue" style="font-size:22px;font-weight:700;">{{ order_dashboard.revenue_today }} ₽</span>
+  </div>
+
+  <div style="padding:14px 18px;background:#111;color:#fff;border-radius:10px;">
+    <b>Автообновление</b><br>
+    <span id="dash-live-status" style="font-size:16px;font-weight:700;">включено</span>
+  </div>
+
+  <div style="padding:14px 18px;background:#f1f3f4;border-radius:10px;">
+    <b>Режим списка</b><br>
+    <span style="font-size:16px;font-weight:700;">по умолчанию: активные</span>
+  </div>
+
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+
+{% if order_live %}
+<script>
+(function() {
+  const summaryUrl = "{{ order_live.summary_url }}";
+  let latestOrderId = "{{ order_live.latest_order_id }}";
+  let latestUpdatedAt = "{{ order_live.latest_updated_at }}";
+  let inFlight = false;
+  let audioUnlocked = false;
+
+  const liveStatus = document.getElementById("dash-live-status");
+  const dashNew = document.getElementById("dash-new");
+  const dashActive = document.getElementById("dash-active");
+  const dashDone = document.getElementById("dash-done");
+  const dashRevenue = document.getElementById("dash-revenue");
+
+  let audioContext = null;
+
+  function ensureAudioContext() {
+    if (!audioContext) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      audioContext = new Ctx();
+    }
+    return audioContext;
+  }
+
+  async function unlockAudio() {
+    const ctx = ensureAudioContext();
+    if (!ctx) return;
+
+    if (ctx.state === "suspended") {
+      try {
+        await ctx.resume();
+      } catch (e) {
+        console.error("audio resume failed:", e);
+      }
+    }
+
+    audioUnlocked = ctx.state === "running";
+  }
+
+  function beep(duration = 0.12, frequency = 880, volume = 100.00, delay = 0) {
+    const ctx = ensureAudioContext();
+    if (!ctx || !audioUnlocked) return;
+
+    const startTime = ctx.currentTime + delay;
+
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+
+    gainNode.gain.setValueAtTime(0.0001, startTime);
+    gainNode.gain.exponentialRampToValueAtTime(volume, startTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.start(startTime);
+    oscillator.stop(startTime + duration + 0.02);
+  }
+
+  function playNewOrderSound() {
+    beep(0.10, 880, 0.035, 0);
+    beep(0.10, 988, 0.035, 0.16);
+    beep(0.14, 1174, 0.04, 0.32);
+  }
+
+  async function poll() {
+    if (inFlight) return;
+    inFlight = true;
+
+    try {
+      const resp = await fetch(summaryUrl, {
+        credentials: "same-origin",
+        cache: "no-store"
+      });
+
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+
+      if (dashNew) dashNew.textContent = data.new_count;
+      if (dashActive) dashActive.textContent = data.active_count;
+      if (dashDone) dashDone.textContent = data.done_today;
+      if (dashRevenue) dashRevenue.textContent = data.revenue_today;
+
+      const prevLatestOrderId = String(latestOrderId || "");
+      const prevLatestUpdatedAt = String(latestUpdatedAt || "");
+
+      const nextLatestOrderId = String(data.latest_order_id || "");
+      const nextLatestUpdatedAt = String(data.latest_updated_at || "");
+
+      const hasNewOrder =
+        prevLatestOrderId &&
+        nextLatestOrderId &&
+        nextLatestOrderId !== prevLatestOrderId;
+
+      const changed =
+        nextLatestOrderId !== prevLatestOrderId ||
+        nextLatestUpdatedAt !== prevLatestUpdatedAt;
+
+      latestOrderId = nextLatestOrderId;
+      latestUpdatedAt = nextLatestUpdatedAt;
+
+      if (changed) {
+        if (hasNewOrder) {
+          playNewOrderSound();
+          if (liveStatus) liveStatus.textContent = "новый заказ";
+        } else {
+          if (liveStatus) liveStatus.textContent = "обнаружены изменения";
+        }
+
+        setTimeout(() => {
+          window.location.reload();
+        }, hasNewOrder ? 500 : 150);
+
+        return;
+      }
+
+      if (liveStatus) liveStatus.textContent = audioUnlocked ? "включено" : "включено (звук ждёт активации)";
+    } catch (err) {
+      console.error("admin live poll error:", err);
+      if (liveStatus) liveStatus.textContent = "ошибка";
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  const unlockEvents = ["click", "keydown", "pointerdown", "touchstart"];
+  unlockEvents.forEach((eventName) => {
+    window.addEventListener(eventName, unlockAudio, { passive: true });
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      poll();
+    }
+  });
+
+  setInterval(() => {
+    if (!document.hidden) {
+      poll();
+    }
+  }, 5000);
+})();
+</script>
+<script>
+(function() {
+  function applyStatusRowClasses() {
+    const rows = document.querySelectorAll("#result_list tbody tr");
+    rows.forEach((row) => {
+      row.classList.remove(
+        "row-status-new",
+        "row-status-confirmed",
+        "row-status-cooking",
+        "row-status-on_the_way",
+        "row-status-done",
+        "row-status-canceled"
+      );
+
+      const badge = row.querySelector("[data-order-status]");
+      if (!badge) return;
+
+      const status = badge.getAttribute("data-order-status");
+      if (!status) return;
+
+      row.classList.add(`row-status-${status}`);
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", applyStatusRowClasses);
+  applyStatusRowClasses();
+})();
+</script>
+{% endif %}
+{% endblock %}
