@@ -100,7 +100,26 @@
 </div>
 {% endif %}
 
+{% if order_attention %}
+<div style="margin-top:8px;margin-bottom:24px;">
+  <div style="font-size:18px;font-weight:700;margin-bottom:12px;">Требуют внимания</div>
+
+  <div style="display:flex;gap:16px;flex-wrap:wrap;">
+    {% for item in order_attention %}
+      <a
+        href="{{ item.url }}"
+        style="display:block;min-width:180px;padding:14px 18px;border-radius:12px;background:{{ item.bg }};color:{{ item.fg }};text-decoration:none;"
+      >
+        <div style="font-size:14px;font-weight:600;opacity:.9;">{{ item.title }}</div>
+        <div style="font-size:28px;font-weight:800;line-height:1.2;margin-top:4px;">{{ item.count }}</div>
+      </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}
+
 
 {% block extrahead %}
 {{ block.super }}

@@ -4,7 +4,7 @@ from django.contrib import admin, messages
 from django.http import HttpResponseRedirect
 from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
-from django.db.models import Sum
+from django.db.models import Case, IntegerField, Value, When, Sum
 from django.utils import timezone
 from django.http import JsonResponse
 
@@ -64,6 +64,9 @@ class OrderItemInline(admin.TabularInline):
     can_delete = False
 
     def has_add_permission(self, request, obj=None):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
         return False
 
 
@@ -129,11 +132,12 @@ class OrderAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "status_badge",
-        "fulfillment",
+        "fulfillment_badge",
         "customer_name",
         "customer_phone",
         "short_items",
         "short_address",
+        "short_comment",
         "total",
         "created_at",
         "public_link",
@@ -150,17 +154,18 @@ class OrderAdmin(admin.ModelAdmin):
         "customer_phone",
         "public_id",
         "address_line",
+        "customer_comment",
     )
-    readonly_fields = (
-        "public_id",
-        "total",
-        "created_at",
-        "updated_at",
-        "telegram_chat_id",
-        "telegram_message_id",
-        "status_controls",
-    )
-    ordering = ("-created_at",)
+    # readonly_fields = (
+    #     "public_id",
+    #     "total",
+    #     "created_at",
+    #     "updated_at",
+    #     "telegram_chat_id",
+    #     "telegram_message_id",
+    #     "status_controls",
+    # )
+    # ordering = ("-created_at",)
     date_hierarchy = "created_at"
     inlines = [OrderItemInline]
     actions = [mark_confirmed, mark_cooking, mark_on_the_way, mark_done, mark_canceled]
@@ -224,8 +229,20 @@ class OrderAdmin(admin.ModelAdmin):
     change_list_template = "admin/orders/order/change_list.html"
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        return qs.prefetch_related("items")
+        qs = super().get_queryset(request).prefetch_related("items")
+
+        return qs.annotate(
+            status_priority=Case(
+                When(status=Order.Status.NEW, then=Value(0)),
+                When(status=Order.Status.CONFIRMED, then=Value(1)),
+                When(status=Order.Status.COOKING, then=Value(2)),
+                When(status=Order.Status.ON_THE_WAY, then=Value(3)),
+                When(status=Order.Status.DONE, then=Value(4)),
+                When(status=Order.Status.CANCELED, then=Value(5)),
+                default=Value(99),
+                output_field=IntegerField(),
+            )
+        ).order_by("status_priority", "-created_at", "-id")
 
     def get_urls(self):
         urls = super().get_urls()
@@ -245,8 +262,13 @@ class OrderAdmin(admin.ModelAdmin):
 
     def set_status_view(self, request, order_id: int, target_status: str):
         order = self.get_queryset(request).filter(pk=order_id).first()
+
         if not order:
             self.message_user(request, "Заказ не найден.", level=messages.ERROR)
+            return HttpResponseRedirect(reverse("admin:orders_order_changelist"))
+
+        if not self.has_change_permission(request, obj=order):
+            self.message_user(request, "Недостаточно прав для изменения заказа.", level=messages.ERROR)
             return HttpResponseRedirect(reverse("admin:orders_order_changelist"))
 
         if target_status not in dict(Order.Status.choices):
@@ -352,23 +374,42 @@ class OrderAdmin(admin.ModelAdmin):
 
     status_badge.short_description = "Статус"
 
+    def fulfillment_badge(self, obj):
+        if obj.fulfillment == Order.Fulfillment.PICKUP:
+            bg, fg = "#f1f3f4", "#111"
+            label = "Самовывоз"
+        else:
+            bg, fg = "#eef4ff", "#0b57d0"
+            label = "Доставка"
+
+        return format_html(
+            '<span style="display:inline-block;padding:4px 10px;border-radius:999px;background:{};color:{};font-weight:700;">{}</span>',
+            bg,
+            fg,
+            label,
+        )
+
+    fulfillment_badge.short_description = "Получение"
+
     def short_items(self, obj):
-        items = list(obj.items.all()[:3])
+        items = list(obj.items.all())
         if not items:
             return "—"
 
-        parts = [f"{item.product_name} × {item.quantity}" for item in items]
-        total_count = len(obj.items.all())
-        if total_count > 3:
-            parts.append(f"... ещё {total_count - 3}")
+        visible = items[:3]
+        parts = [f"{item.product_name} × {item.quantity}" for item in visible]
 
-        return "; ".join(parts)
+        if len(items) > 3:
+            parts.append(f"... ещё {len(items) - 3}")
+
+        return format_html("<div style='max-width:320px;line-height:1.45;'>{}</div>", "; ".join(parts))
 
     short_items.short_description = "Состав"
 
     def short_address(self, obj):
         if obj.fulfillment == Order.Fulfillment.PICKUP:
-            return "Самовывоз"
+            # return format_html("{}", "<span style='color:#666;'>Самовывоз</span>")
+            return mark_safe("<span style='color:#666;'>Самовывоз</span>")
 
         if not obj.address_line:
             return "—"
@@ -383,12 +424,28 @@ class OrderAdmin(admin.ModelAdmin):
         if obj.address_apartment:
             extra.append(f"кв/оф. {obj.address_apartment}")
 
+        text = " ".join(parts)
         if extra:
-            parts.append(f"({', '.join(extra)})")
+            text += f" ({', '.join(extra)})"
 
-        return " ".join(parts)
-
+        return format_html("<div style='max-width:260px;line-height:1.4;'>{}</div>", text)
+    
     short_address.short_description = "Адрес"
+
+    def short_comment(self, obj):
+        if not obj.customer_comment:
+            return "—"
+
+        text = obj.customer_comment.strip()
+        if len(text) > 80:
+            text = text[:77] + "..."
+
+        return format_html(
+            "<div style='max-width:220px;line-height:1.4;color:#444;'>{}</div>",
+            text,
+        )
+
+    short_comment.short_description = "Комментарий"
 
     def public_link(self, obj):
         url = reverse("orders:order_status", kwargs={"public_id": obj.public_id})
@@ -398,38 +455,66 @@ class OrderAdmin(admin.ModelAdmin):
 
 
     def changelist_view(self, request, extra_context=None):
-
         today = timezone.localdate()
-
         qs = Order.objects.all()
 
         new_orders = qs.filter(status=Order.Status.NEW).count()
-
         active_orders = qs.exclude(
             status__in=[Order.Status.DONE, Order.Status.CANCELED]
         ).count()
-
         done_today = qs.filter(
             status=Order.Status.DONE,
             created_at__date=today,
         ).count()
-
         revenue_today = qs.filter(
             status=Order.Status.DONE,
             created_at__date=today,
         ).aggregate(total=Sum("total"))["total"] or 0
 
-        extra_context = extra_context or {}
+        cooking_orders = qs.filter(status=Order.Status.COOKING).count()
+        on_the_way_orders = qs.filter(status=Order.Status.ON_THE_WAY).count()
 
+        latest = qs.order_by("-updated_at", "-id").first()
+
+        changelist_url = reverse("admin:orders_order_changelist")
+
+        extra_context = extra_context or {}
         extra_context["order_dashboard"] = {
             "new": new_orders,
             "active": active_orders,
             "done_today": done_today,
             "revenue_today": revenue_today,
         }
-
-        latest = qs.order_by("-updated_at", "-id").first()
-
+        extra_context["order_attention"] = [
+            {
+                "title": "Новые",
+                "count": new_orders,
+                "bg": "#e8f0fe",
+                "fg": "#174ea6",
+                "url": f"{changelist_url}?status__exact={Order.Status.NEW}",
+            },
+            {
+                "title": "Готовятся",
+                "count": cooking_orders,
+                "bg": "#fff4e5",
+                "fg": "#b06000",
+                "url": f"{changelist_url}?status__exact={Order.Status.COOKING}",
+            },
+            {
+                "title": "В пути",
+                "count": on_the_way_orders,
+                "bg": "#eef4ff",
+                "fg": "#0b57d0",
+                "url": f"{changelist_url}?status__exact={Order.Status.ON_THE_WAY}",
+            },
+            {
+                "title": "Все активные",
+                "count": active_orders,
+                "bg": "#f1f3f4",
+                "fg": "#111",
+                "url": f"{changelist_url}?activity=active",
+            },
+        ]
         extra_context["order_live"] = {
             "summary_url": reverse("admin:orders_order_live_summary"),
             "latest_order_id": latest.id if latest else "",
@@ -470,4 +555,45 @@ class OrderAdmin(admin.ModelAdmin):
     # def change_view(self, request, object_id, form_url="", extra_context=None):
     #     self._status_controls_csrf_token = get_token(request)
     #     return super().change_view(request, object_id, form_url, extra_context)
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
     
+
+    def get_readonly_fields(self, request, obj=None):
+        base_readonly = [
+            "public_id",
+            "total",
+            "created_at",
+            "updated_at",
+            "telegram_chat_id",
+            "telegram_message_id",
+            "status_controls",
+        ]
+
+        if request.user.is_superuser:
+            return base_readonly
+
+        return base_readonly + [
+            "status",
+            "fulfillment",
+            "customer_name",
+            "customer_phone",
+            "customer_comment",
+            "address_line",
+            "address_entrance",
+            "address_floor",
+            "address_apartment",
+        ]
+    
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+
+        if request.user.is_superuser:
+            return actions
+
+        return {}
