@@ -32,12 +32,29 @@ class Order(models.Model):
 
     total = models.DecimalField("Итого", max_digits=10, decimal_places=2, default=0)
 
+    telegram_chat_id = models.CharField("Telegram chat id", max_length=64, blank=True)
+    telegram_message_id = models.BigIntegerField("Telegram message id", null=True, blank=True)
+
     created_at = models.DateTimeField("Создано", auto_now_add=True)
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
 
-    # public_id = models.UUIDField("Публичный идентификатор", default=uuid.uuid4, unique=True, editable=False) to be deleted
-    # public_id = models.UUIDField("Публичный идентификатор", default=uuid.uuid4, null=True, editable=False) to be deleted
     public_id = models.UUIDField("Публичный идентификатор", default=uuid.uuid4, unique=True, editable=False)
+
+
+    STATUS_TRANSITIONS = {
+        Status.NEW: {Status.CONFIRMED, Status.CANCELED},
+        Status.CONFIRMED: {Status.COOKING, Status.CANCELED},
+        Status.COOKING: {Status.ON_THE_WAY, Status.DONE, Status.CANCELED},
+        Status.ON_THE_WAY: {Status.DONE, Status.CANCELED},
+        Status.DONE: set(),
+        Status.CANCELED: set(),
+    }
+
+    def allowed_next_statuses(self):
+        return self.STATUS_TRANSITIONS.get(self.status, set())
+
+    def can_transition_to(self, new_status: str) -> bool:
+        return new_status in self.allowed_next_statuses()
 
     class Meta:
         verbose_name = "Заказ"

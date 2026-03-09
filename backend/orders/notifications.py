@@ -1,13 +1,55 @@
 from __future__ import annotations
 
-from django.urls import reverse
-
 from .models import Order
+
+
+STATUS_BUTTONS = {
+    Order.Status.CONFIRMED: "Подтвердить",
+    Order.Status.COOKING: "Готовится",
+    Order.Status.ON_THE_WAY: "В пути",
+    Order.Status.DONE: "Выполнен",
+    Order.Status.CANCELED: "Отменить",
+}
+
+
+def build_order_status_keyboard(order: Order) -> dict | None:
+    allowed = list(order.allowed_next_statuses())
+    if not allowed:
+        return None
+
+    rows = []
+    current_row = []
+
+    ordered_statuses = [
+        Order.Status.CONFIRMED,
+        Order.Status.COOKING,
+        Order.Status.ON_THE_WAY,
+        Order.Status.DONE,
+        Order.Status.CANCELED,
+    ]
+
+    for status in ordered_statuses:
+        if status not in allowed:
+            continue
+
+        current_row.append({
+            "text": STATUS_BUTTONS[status],
+            "callback_data": f"order:{order.id}:status:{status}",
+        })
+
+        if len(current_row) == 2:
+            rows.append(current_row)
+            current_row = []
+
+    if current_row:
+        rows.append(current_row)
+
+    return {"inline_keyboard": rows}
 
 
 def format_new_order_message(order: Order) -> str:
     lines = []
-    lines.append(f"<b>Новый заказ</b> №{order.id}")
+    lines.append(f"<b>Заказ №{order.id}</b>")
     lines.append(f"<b>Статус:</b> {order.get_status_display()}")
     lines.append(f"<b>Способ:</b> {order.get_fulfillment_display()}")
     lines.append(f"<b>Имя:</b> {order.customer_name}")

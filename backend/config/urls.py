@@ -24,6 +24,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("catalog.urls")),
     path("cart/", include("orders.urls")),
+
+    # path("telegram/webhook/<str:secret>/", include("promotions.urls")),
+    path("telegram/", include("orders.telegram_urls")),
 ]
 
 if settings.DEBUG:

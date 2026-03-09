@@ -10,12 +10,14 @@ from .forms import CheckoutForm
 from .models import Order, OrderItem
 
 from integrations.telegram.client import send_message, TelegramError
-from .notifications import format_new_order_message
+from .notifications import format_new_order_message, build_order_status_keyboard
 import logging
 
 from .cart import _get_cart_dict, cart_get_qty  # добавь импорт (или сделай отдельную функцию cart_get_qty)
 
 from .cart import cart_add, cart_clear, cart_count, cart_lines, cart_set
+
+
 
 
 def cart_page(request):
@@ -107,8 +109,20 @@ def checkout_page(request):
 
 
             try:
-                # важно: order.items уже созданы, поэтому message будет с позициями
-                send_message(format_new_order_message(order))
+                result = send_message(
+                    format_new_order_message(order),
+                    reply_markup=build_order_status_keyboard(order),
+                )
+
+                telegram_result = (result or {}).get("result") or {}
+                chat = telegram_result.get("chat") or {}
+                message_id = telegram_result.get("message_id")
+
+                chat_id = chat.get("id")
+                if chat_id is not None and message_id is not None:
+                    order.telegram_chat_id = str(chat_id)
+                    order.telegram_message_id = int(message_id)
+                    order.save(update_fields=["telegram_chat_id", "telegram_message_id", "updated_at"])
             except TelegramError as e:
                 # В MVP не ломаем заказ из-за Telegram
                 logger.exception("Telegram notification failed: %s", e)
