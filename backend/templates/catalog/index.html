@@ -2,21 +2,19 @@
 {% load dicts %}
 {% block title %}Сказка{% endblock %}
 
-{% block content %}
-  <section style="margin-bottom:28px;">
+{% block hero_full %}
+<section class="hero-full">
   {% if banners %}
     <style>
       #promo-slider {
         position: relative;
-        border: 1px solid #ddd;
-        border-radius: 18px;
         overflow: hidden;
         background: #f5f5f5;
       }
 
       .promo-slides {
         position: relative;
-        min-height: 320px;
+        min-height: 420px;
       }
 
       .promo-slide {
@@ -55,14 +53,14 @@
       .promo-slide-overlay {
         position: relative;
         z-index: 1;
-        min-height: 320px;
+        min-height: 420px;
         display: flex;
         align-items: center;
-        padding: 28px;
+        padding: 36px 0;
         background: linear-gradient(
           90deg,
-          rgba(0, 0, 0, .58) 0%,
-          rgba(0, 0, 0, .24) 45%,
+          rgba(0, 0, 0, .62) 0%,
+          rgba(0, 0, 0, .28) 45%,
           rgba(0, 0, 0, .08) 100%
         );
       }
@@ -73,27 +71,27 @@
       }
 
       .promo-slide-title {
-        font-size: 34px;
-        font-weight: 700;
-        line-height: 1.2;
-        margin-bottom: 12px;
+        font-size: 42px;
+        font-weight: 800;
+        line-height: 1.15;
+        margin-bottom: 14px;
       }
 
       .promo-slide-subtitle {
-        font-size: 16px;
-        line-height: 1.5;
-        opacity: .95;
-        margin-bottom: 16px;
+        font-size: 17px;
+        line-height: 1.55;
+        opacity: .96;
+        margin-bottom: 18px;
       }
 
       .promo-slide-btn {
         display: inline-block;
-        padding: 10px 16px;
+        padding: 12px 18px;
         border-radius: 10px;
         background: #fff;
         color: #111;
         text-decoration: none;
-        font-weight: 600;
+        font-weight: 700;
       }
 
       .promo-nav-btn {
@@ -101,8 +99,8 @@
         top: 50%;
         transform: translateY(-50%);
         z-index: 3;
-        width: 40px;
-        height: 40px;
+        width: 44px;
+        height: 44px;
         border-radius: 999px;
         border: 1px solid rgba(255,255,255,.35);
         background: rgba(0,0,0,.35);
@@ -114,13 +112,13 @@
         background: rgba(0,0,0,.5);
       }
 
-      #promo-prev { left: 12px; }
-      #promo-next { right: 12px; }
+      #promo-prev { left: 16px; }
+      #promo-next { right: 16px; }
 
       #promo-dots {
         position: absolute;
         left: 50%;
-        bottom: 14px;
+        bottom: 18px;
         transform: translateX(-50%);
         z-index: 3;
         display: flex;
@@ -144,18 +142,18 @@
       @media (max-width: 768px) {
         .promo-slides,
         .promo-slide-overlay {
-          min-height: 260px;
+          min-height: 300px;
         }
 
         .promo-slide-title {
-          font-size: 26px;
+          font-size: 28px;
         }
 
         .promo-slide-subtitle {
           font-size: 14px;
         }
       }
-      </style>
+    </style>
 
     <div
       id="promo-slider"
@@ -171,32 +169,26 @@
             aria-hidden="{% if forloop.first %}false{% else %}true{% endif %}"
           >
             <div class="promo-slide-bg">
-              <img
-                src="{{ banner.image.url }}"
-                alt="{{ banner.title }}"
-              />
+              <img src="{{ banner.image.url }}" alt="{{ banner.title }}" />
             </div>
 
             <div class="promo-slide-overlay">
-              <div class="promo-slide-content">
-                <div class="promo-slide-title">
-                  {{ banner.title }}
+              <div class="container">
+                <div class="promo-slide-content">
+                  <div class="promo-slide-title">{{ banner.title }}</div>
+
+                  {% if banner.subtitle %}
+                    <div class="promo-slide-subtitle">
+                      {{ banner.subtitle|linebreaksbr }}
+                    </div>
+                  {% endif %}
+
+                  {% if banner.button_text and banner.button_url %}
+                    <a href="{{ banner.button_url }}" class="promo-slide-btn">
+                      {{ banner.button_text }}
+                    </a>
+                  {% endif %}
                 </div>
-
-                {% if banner.subtitle %}
-                  <div class="promo-slide-subtitle">
-                    {{ banner.subtitle|linebreaksbr }}
-                  </div>
-                {% endif %}
-
-                {% if banner.button_text and banner.button_url %}
-                  <a
-                    href="{{ banner.button_url }}"
-                    class="promo-slide-btn"
-                  >
-                    {{ banner.button_text }}
-                  </a>
-                {% endif %}
               </div>
             </div>
           </div>
@@ -204,23 +196,8 @@
       </div>
 
       {% if banners|length > 1 %}
-        <button
-          type="button"
-          id="promo-prev"
-          class="promo-nav-btn"
-          aria-label="Предыдущий баннер"
-        >
-          ←
-        </button>
-
-        <button
-          type="button"
-          id="promo-next"
-          class="promo-nav-btn"
-          aria-label="Следующий баннер"
-        >
-          →
-        </button>
+        <button type="button" id="promo-prev" class="promo-nav-btn" aria-label="Предыдущий баннер">←</button>
+        <button type="button" id="promo-next" class="promo-nav-btn" aria-label="Следующий баннер">→</button>
 
         <div id="promo-dots" aria-label="Навигация по баннерам">
           {% for banner in banners %}
@@ -235,349 +212,391 @@
       {% endif %}
     </div>
   {% else %}
-    <div style="border:1px solid #ddd;border-radius:18px;overflow:hidden;background:#f5f5f5;min-height:260px;display:flex;align-items:center;justify-content:center;padding:24px;">
-      <div style="text-align:center;max-width:700px;">
-        <div style="font-size:32px;font-weight:700;margin-bottom:12px;">Слайдер / акции / баннеры</div>
-        <div style="opacity:.75;line-height:1.5;">
-          Здесь позже можно разместить акции, сезонные предложения, важные уведомления и рекламные баннеры.
+    <div style="background:#f3f3f3;">
+      <div class="container">
+        <div style="min-height:360px;display:flex;align-items:center;padding:40px 0;">
+          <div style="max-width:620px;">
+            <div style="font-size:42px;font-weight:800;line-height:1.1;margin-bottom:14px;">Кафе «Сказка»</div>
+            <div style="font-size:18px;line-height:1.6;color:#333;margin-bottom:18px;">
+              Доставка, самовывоз, бизнес-ланчи, банкеты и выездной кейтеринг.
+            </div>
+            <a href="{% url 'catalog:index' %}" class="btn btn-primary">Перейти к меню</a>
+          </div>
         </div>
       </div>
     </div>
   {% endif %}
-  </section>
+</section>
+{% endblock %}
 
-  <section>
-    <div style="display:flex;align-items:end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;">
-      <div>
-        <h1 style="margin:0 0 8px;">Меню</h1>
-        <div style="opacity:.75;">Выбери категорию и смотри превью товаров</div>
+{% block content %}
+<section style="margin-bottom:40px;">
+  <h2 class="section-title">Дополнительные направления</h2>
+
+  <div class="teaser-grid">
+    <article class="teaser-card">
+      <div style="font-size:24px;font-weight:800;">Бизнес-ланчи</div>
+      <div class="muted" style="line-height:1.55;">
+        Фиксированные предложения, которые обновляются по неделям. Подходят как для сотрудников компаний, так и для частных клиентов.
       </div>
+      <div style="margin-top:auto;">
+        <a href="{% url 'core:business_lunches' %}" class="btn">Подробнее</a>
+      </div>
+    </article>
+
+    <article class="teaser-card">
+      <div style="font-size:24px;font-weight:800;">Банкеты</div>
+      <div class="muted" style="line-height:1.55;">
+        Информация о проведении банкетов, форматах обслуживания и возможностях организации мероприятий.
+      </div>
+      <div style="margin-top:auto;">
+        <a href="{% url 'core:banquets' %}" class="btn">Подробнее</a>
+      </div>
+    </article>
+
+    <article class="teaser-card">
+      <div style="font-size:24px;font-weight:800;">Выездной кейтеринг</div>
+      <div class="muted" style="line-height:1.55;">
+        Обслуживание мероприятий вне площадки кафе: корпоративы, встречи, праздники и другие выездные форматы.
+      </div>
+      <div style="margin-top:auto;">
+        <a href="{% url 'core:catering' %}" class="btn">Подробнее</a>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section>
+  <div style="display:flex;align-items:end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px;">
+    <div>
+      <h2 class="section-title" style="margin-bottom:8px;">Меню</h2>
+      <div class="muted">Выбери категорию и смотри превью товаров</div>
     </div>
 
-    {% if not preview_sections %}
-      <div style="border:1px solid #ddd;border-radius:12px;padding:20px;">
-        <div style="font-size:20px;font-weight:600;margin-bottom:8px;">Пока нет доступных блюд</div>
-        <div style="opacity:.75;">Добавь товары в админке, и они появятся здесь.</div>
-      </div>
-    {% else %}
-      <div id="category-filters" class="filter-row">
+    <a id="category-more-link" href="#" style="display:none;" class="btn-link">Смотреть все</a>
+  </div>
+
+  {% if not preview_sections %}
+    <div class="card" style="padding:20px;">
+      <div style="font-size:20px;font-weight:600;margin-bottom:8px;">Пока нет доступных блюд</div>
+      <div class="muted">Добавь товары в админке, и они появятся здесь.</div>
+    </div>
+  {% else %}
+    <div id="category-filters" class="filter-row">
+      <button
+        type="button"
+        data-category-filter="all"
+        data-category-url=""
+        class="filter-btn is-active"
+      >
+        Все
+      </button>
+
+      {% for category in categories %}
         <button
           type="button"
-          data-category-filter="all"
-          data-category-url=""
-          class="filter-btn is-active"
+          data-category-filter="{{ category.slug }}"
+          data-category-url="{% url 'catalog:category_detail' category.slug %}"
+          class="filter-btn"
         >
-          Все
+          {{ category.name }}
         </button>
+      {% endfor %}
+    </div>
 
-        {% for category in categories %}
-          <button
-            type="button"
-            data-category-filter="{{ category.slug }}"
-            data-category-url="{% url 'catalog:category_detail' category.slug %}"
-            class="filter-btn"
-          >
-            {{ category.name }}
-          </button>
-        {% endfor %}
-      </div>
-
-      <div id="preview-sections" style="display:grid;gap:32px;transition:opacity .25s ease-in-out, transform .25s ease-in-out;">
-        {% for section in preview_sections %}
-          <section
-            data-category-slug="{{ section.category.slug }}"
-            style="transition:opacity .25s ease-in-out, transform .25s ease-in-out;"
-          >
-            <div style="display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
-              <div>
-                <h2 style="margin:0 0 4px;">{{ section.category.name }}</h2>
-                <div style="opacity:.65;font-size:13px;">
-                  Показано {{ section.products|length }} из {{ section.total_products }}
-                </div>
+    <div id="preview-sections" style="display:grid;gap:32px;transition:opacity .25s ease-in-out, transform .25s ease-in-out;">
+      {% for section in preview_sections %}
+        <section
+          data-category-slug="{{ section.category.slug }}"
+          style="transition:opacity .25s ease-in-out, transform .25s ease-in-out;"
+        >
+          <div style="display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+            <div>
+              <h3 style="margin:0 0 4px;font-size:24px;">{{ section.category.name }}</h3>
+              <div class="muted" style="font-size:13px;">
+                Показано {{ section.products|length }} из {{ section.total_products }}
               </div>
-
-              <a href="{% url 'catalog:category_detail' section.category.slug %}">
-                Смотреть все
-              </a>
             </div>
 
-            <div class="catalog-grid">
-              {% for p in section.products %}
-                <article class="card product-card">
-                  <a href="{% url 'catalog:product_detail' p.slug %}" class="product-card-media" style="text-decoration:none;color:inherit;">
-                    {% if p.main_image %}
-                      <div style="aspect-ratio:1/1;background:#f3f3f3;">
-                        <img
-                          src="{{ p.main_image.image.url }}"
-                          alt="{{ p.main_image.alt_text|default:p.name }}"
-                          style="width:100%;height:100%;object-fit:cover;display:block;"
-                        />
-                      </div>
-                    {% else %}
-                      <div style="aspect-ratio:1/1;background:#f3f3f3;display:flex;align-items:center;justify-content:center;opacity:.55;">
-                        Нет фото
-                      </div>
-                    {% endif %}
-                  </a>
+            <a href="{% url 'catalog:category_detail' section.category.slug %}" class="btn-link">
+              Смотреть все
+            </a>
+          </div>
 
-                  <div class="card-body" style="display:flex;flex-direction:column;gap:10px;flex:1;">
-                    <div style="font-size:12px;opacity:.65;">{{ section.category.name }}</div>
+          <div class="catalog-grid">
+            {% for p in section.products %}
+              <article class="card product-card">
+                <a href="{% url 'catalog:product_detail' p.slug %}" class="product-card-media" style="text-decoration:none;color:inherit;">
+                  {% if p.main_image %}
+                    <img
+                      src="{{ p.main_image.image.url }}"
+                      alt="{{ p.main_image.alt_text|default:p.name }}"
+                    />
+                  {% else %}
+                    <div style="aspect-ratio:1/1;background:#f3f3f3;display:flex;align-items:center;justify-content:center;opacity:.55;">
+                      Нет фото
+                    </div>
+                  {% endif %}
+                </a>
 
-                    <div class="product-card-title">
-                      <a href="{% url 'catalog:product_detail' p.slug %}" style="text-decoration:none;color:inherit;">
-                        {{ p.name }}
-                      </a>
+                <div class="card-body" style="display:flex;flex-direction:column;gap:10px;flex:1;">
+                  <div class="muted" style="font-size:12px;">{{ section.category.name }}</div>
+
+                  <div class="product-card-title">
+                    <a href="{% url 'catalog:product_detail' p.slug %}" style="text-decoration:none;color:inherit;">
+                      {{ p.name }}
+                    </a>
+                  </div>
+
+                  {% if p.description %}
+                    <div class="product-card-desc">
+                      {{ p.description|truncatechars:110 }}
+                    </div>
+                  {% endif %}
+
+                  <div class="product-card-footer">
+                    <div class="price-block">
+                      <div class="price-main">{{ p.price }} ₽</div>
+                      {% if p.weight_grams %}
+                        <div class="muted" style="font-size:12px;">{{ p.weight_grams }} г</div>
+                      {% endif %}
                     </div>
 
-                    {% if p.description %}
-                      <div class="product-card-desc">
-                        {{ p.description|truncatechars:110 }}
-                      </div>
-                    {% endif %}
+                    <div class="qty-controls">
+                      {% with q=cart_map|get_item:p.id %}
+                        <button
+                          type="button"
+                          data-cart-action="dec"
+                          data-product-id="{{ p.id }}"
+                          {% if not q %}disabled{% endif %}
+                          class="btn-icon"
+                        >−</button>
 
-                    <div class="product-card-footer">
-                      <div class="price-block">
-                        <div class="price-main">{{ p.price }} ₽</div>
-                        {% if p.weight_grams %}
-                          <div class="muted" style="font-size:12px;">{{ p.weight_grams }} г</div>
-                        {% endif %}
-                      </div>
+                        <span data-qty="{{ p.id }}" class="qty-value">
+                          {{ q|default:0 }}
+                        </span>
 
-                      <div class="qty-controls">
-                        {% with q=cart_map|get_item:p.id %}
-                          <button
-                            type="button"
-                            data-cart-action="dec"
-                            data-product-id="{{ p.id }}"
-                            {% if not q %}disabled{% endif %}
-                            class="btn-icon"
-                          >−</button>
-
-                          <span data-qty="{{ p.id }}" class="qty-value">
-                            {{ q|default:0 }}
-                          </span>
-
-                          <button
-                            type="button"
-                            data-cart-action="add"
-                            data-product-id="{{ p.id }}"
-                            class="btn-icon"
-                          >+</button>
-                        {% endwith %}
-                      </div>
+                        <button
+                          type="button"
+                          data-cart-action="add"
+                          data-product-id="{{ p.id }}"
+                          class="btn-icon"
+                        >+</button>
+                      {% endwith %}
                     </div>
                   </div>
-                </article>
-              {% endfor %}
-            </div>
-          </section>
-        {% endfor %}
-      </div>
-    {% endif %}
-  </section>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
 
-  <script>
-    (function() {
-      const filtersWrap = document.getElementById("category-filters");
-      const sectionsWrap = document.getElementById("preview-sections");
-      const moreLink = document.getElementById("category-more-link");
-      if (!filtersWrap || !sectionsWrap) return;
+<script>
+(function() {
+  const filtersWrap = document.getElementById("category-filters");
+  const sectionsWrap = document.getElementById("preview-sections");
+  const moreLink = document.getElementById("category-more-link");
+  if (!filtersWrap || !sectionsWrap) return;
 
-      const buttons = Array.from(filtersWrap.querySelectorAll("[data-category-filter]"));
-      const sections = Array.from(sectionsWrap.querySelectorAll("[data-category-slug]"));
+  const buttons = Array.from(filtersWrap.querySelectorAll("[data-category-filter]"));
+  const sections = Array.from(sectionsWrap.querySelectorAll("[data-category-slug]"));
 
-      function setActiveButton(activeSlug) {
-        buttons.forEach((btn) => {
-          const isActive = btn.getAttribute("data-category-filter") === activeSlug;
-          btn.classList.toggle("is-active", isActive);
-        });
-      }
+  function setActiveButton(activeSlug) {
+    buttons.forEach((btn) => {
+      const isActive = btn.getAttribute("data-category-filter") === activeSlug;
+      btn.classList.toggle("is-active", isActive);
+    });
+  }
 
-      function updateMoreLink(activeSlug) {
-        if (!moreLink) return;
+  function updateMoreLink(activeSlug) {
+    if (!moreLink) return;
 
-        if (activeSlug === "all") {
-          moreLink.style.display = "none";
-          moreLink.setAttribute("href", "#");
-          return;
-        }
+    if (activeSlug === "all") {
+      moreLink.style.display = "none";
+      moreLink.setAttribute("href", "#");
+      return;
+    }
 
-        const activeBtn = filtersWrap.querySelector(`[data-category-filter="${activeSlug}"]`);
-        const url = activeBtn ? activeBtn.getAttribute("data-category-url") : "";
+    const activeBtn = filtersWrap.querySelector(`[data-category-filter="${activeSlug}"]`);
+    const url = activeBtn ? activeBtn.getAttribute("data-category-url") : "";
 
-        if (url) {
-          moreLink.style.display = "inline";
-          moreLink.setAttribute("href", url);
-          moreLink.textContent = "Смотреть все";
-        } else {
-          moreLink.style.display = "none";
-          moreLink.setAttribute("href", "#");
-        }
-      }
+    if (url) {
+      moreLink.style.display = "inline-flex";
+      moreLink.setAttribute("href", url);
+      moreLink.textContent = "Смотреть все";
+    } else {
+      moreLink.style.display = "none";
+      moreLink.setAttribute("href", "#");
+    }
+  }
 
-      function showSections(activeSlug) {
-        sectionsWrap.style.opacity = "0";
-        sectionsWrap.style.transform = "translateY(6px)";
+  function showSections(activeSlug) {
+    sectionsWrap.style.opacity = "0";
+    sectionsWrap.style.transform = "translateY(6px)";
 
-        setTimeout(() => {
-          sections.forEach((section) => {
-            const slug = section.getAttribute("data-category-slug");
-            const visible = activeSlug === "all" || slug === activeSlug;
-            section.style.display = visible ? "block" : "none";
-          });
-
-          setActiveButton(activeSlug);
-          updateMoreLink(activeSlug);
-
-          sectionsWrap.style.opacity = "1";
-          sectionsWrap.style.transform = "translateY(0)";
-        }, 180);
-      }
-
-      buttons.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const slug = btn.getAttribute("data-category-filter") || "all";
-          showSections(slug);
-        });
+    setTimeout(() => {
+      sections.forEach((section) => {
+        const slug = section.getAttribute("data-category-slug");
+        const visible = activeSlug === "all" || slug === activeSlug;
+        section.style.display = visible ? "block" : "none";
       });
 
-      showSections("all");
-    })();
-  </script>
-  
-  <script>
-  (function() {
-    const slider = document.getElementById("promo-slider");
-    if (!slider) return;
+      setActiveButton(activeSlug);
+      updateMoreLink(activeSlug);
 
-    const slides = Array.from(slider.querySelectorAll(".promo-slide"));
-    if (slides.length <= 1) return;
+      sectionsWrap.style.opacity = "1";
+      sectionsWrap.style.transform = "translateY(0)";
+    }, 180);
+  }
 
-    const prevBtn = document.getElementById("promo-prev");
-    const nextBtn = document.getElementById("promo-next");
-    const dots = Array.from(slider.querySelectorAll("[data-dot-index]"));
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const slug = btn.getAttribute("data-category-filter") || "all";
+      showSections(slug);
+    });
+  });
 
-    const autoplayEnabled = slider.getAttribute("data-autoplay") === "true";
-    const autoplayDelay = Number(slider.getAttribute("data-autoplay-delay") || 5000);
+  showSections("all");
+})();
+</script>
 
-    let current = 0;
-    let autoplayTimer = null;
-    let touchStartX = 0;
-    let touchEndX = 0;
-    let isHovered = false;
+<script>
+(function() {
+  const slider = document.getElementById("promo-slider");
+  if (!slider) return;
 
-    function renderSlide(index) {
-      slides.forEach((slide, i) => {
-        const active = i === index;
-        slide.classList.toggle("is-active", active);
-        slide.setAttribute("aria-hidden", active ? "false" : "true");
-      });
+  const slides = Array.from(slider.querySelectorAll(".promo-slide"));
+  if (slides.length <= 1) return;
 
-      dots.forEach((dot, i) => {
-        dot.classList.toggle("is-active", i === index);
-      });
-    }
+  const prevBtn = document.getElementById("promo-prev");
+  const nextBtn = document.getElementById("promo-next");
+  const dots = Array.from(slider.querySelectorAll("[data-dot-index]"));
 
-    function goTo(index) {
-      if (index < 0) index = slides.length - 1;
-      if (index >= slides.length) index = 0;
-      current = index;
-      renderSlide(current);
-    }
+  const autoplayEnabled = slider.getAttribute("data-autoplay") === "true";
+  const autoplayDelay = Number(slider.getAttribute("data-autoplay-delay") || 5000);
 
-    function next() {
-      goTo(current + 1);
-    }
+  let current = 0;
+  let autoplayTimer = null;
+  let touchStartX = 0;
+  let touchEndX = 0;
+  let isHovered = false;
 
-    function prev() {
-      goTo(current - 1);
-    }
-
-    function stopAutoplay() {
-      if (autoplayTimer) {
-        clearInterval(autoplayTimer);
-        autoplayTimer = null;
-      }
-    }
-
-    function startAutoplay() {
-      if (!autoplayEnabled) return;
-      stopAutoplay();
-
-      autoplayTimer = setInterval(() => {
-        if (!isHovered) {
-          next();
-        }
-      }, autoplayDelay);
-    }
-
-    if (prevBtn) {
-      prevBtn.addEventListener("click", () => {
-        prev();
-        startAutoplay();
-      });
-    }
-
-    if (nextBtn) {
-      nextBtn.addEventListener("click", () => {
-        next();
-        startAutoplay();
-      });
-    }
-
-    dots.forEach((dot) => {
-      dot.addEventListener("click", () => {
-        const idx = Number(dot.getAttribute("data-dot-index"));
-        goTo(idx);
-        startAutoplay();
-      });
+  function renderSlide(index) {
+    slides.forEach((slide, i) => {
+      const active = i === index;
+      slide.classList.toggle("is-active", active);
+      slide.setAttribute("aria-hidden", active ? "false" : "true");
     });
 
-    slider.addEventListener("mouseenter", () => {
-      isHovered = true;
+    dots.forEach((dot, i) => {
+      dot.classList.toggle("is-active", i === index);
     });
+  }
 
-    slider.addEventListener("mouseleave", () => {
-      isHovered = false;
-    });
-
-    slider.addEventListener("touchstart", (e) => {
-      if (!e.touches || !e.touches.length) return;
-      touchStartX = e.touches[0].clientX;
-      touchEndX = touchStartX;
-    }, { passive: true });
-
-    slider.addEventListener("touchmove", (e) => {
-      if (!e.touches || !e.touches.length) return;
-      touchEndX = e.touches[0].clientX;
-    }, { passive: true });
-
-    slider.addEventListener("touchend", () => {
-      const delta = touchEndX - touchStartX;
-
-      if (Math.abs(delta) > 50) {
-        if (delta < 0) {
-          next();
-        } else {
-          prev();
-        }
-        startAutoplay();
-      }
-
-      touchStartX = 0;
-      touchEndX = 0;
-    });
-
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) {
-        stopAutoplay();
-      } else {
-        startAutoplay();
-      }
-    });
-
+  function goTo(index) {
+    if (index < 0) index = slides.length - 1;
+    if (index >= slides.length) index = 0;
+    current = index;
     renderSlide(current);
-    startAutoplay();
-  })();
-  </script>
+  }
+
+  function next() {
+    goTo(current + 1);
+  }
+
+  function prev() {
+    goTo(current - 1);
+  }
+
+  function stopAutoplay() {
+    if (autoplayTimer) {
+      clearInterval(autoplayTimer);
+      autoplayTimer = null;
+    }
+  }
+
+  function startAutoplay() {
+    if (!autoplayEnabled) return;
+    stopAutoplay();
+
+    autoplayTimer = setInterval(() => {
+      if (!isHovered) {
+        next();
+      }
+    }, autoplayDelay);
+  }
+
+  if (prevBtn) {
+    prevBtn.addEventListener("click", () => {
+      prev();
+      startAutoplay();
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener("click", () => {
+      next();
+      startAutoplay();
+    });
+  }
+
+  dots.forEach((dot) => {
+    dot.addEventListener("click", () => {
+      const idx = Number(dot.getAttribute("data-dot-index"));
+      goTo(idx);
+      startAutoplay();
+    });
+  });
+
+  slider.addEventListener("mouseenter", () => {
+    isHovered = true;
+  });
+
+  slider.addEventListener("mouseleave", () => {
+    isHovered = false;
+  });
+
+  slider.addEventListener("touchstart", (e) => {
+    if (!e.touches || !e.touches.length) return;
+    touchStartX = e.touches[0].clientX;
+    touchEndX = touchStartX;
+  }, { passive: true });
+
+  slider.addEventListener("touchmove", (e) => {
+    if (!e.touches || !e.touches.length) return;
+    touchEndX = e.touches[0].clientX;
+  }, { passive: true });
+
+  slider.addEventListener("touchend", () => {
+    const delta = touchEndX - touchStartX;
+
+    if (Math.abs(delta) > 50) {
+      if (delta < 0) {
+        next();
+      } else {
+        prev();
+      }
+      startAutoplay();
+    }
+
+    touchStartX = 0;
+    touchEndX = 0;
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopAutoplay();
+    } else {
+      startAutoplay();
+    }
+  });
+
+  renderSlide(current);
+  startAutoplay();
+})();
+</script>
 {% endblock %}
