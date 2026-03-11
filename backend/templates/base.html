@@ -685,7 +685,14 @@
   <div class="site-topbar">
     <div class="container">
       <div class="site-topbar-inner">
-        <div>Кафе «Сказка»</div>
+        <div>
+          Кафе «Сказка»
+          {% if cafe_is_open_now %}
+            <span style="margin-left:8px;color:#7CFF9B;">● Открыто</span>
+          {% else %}
+            <span style="margin-left:8px;color:#FF9B9B;">● Закрыто</span>
+          {% endif %}
+        </div>
         <div>Телефон: +7 (000) 000-00-00</div>
       </div>
     </div>
@@ -715,10 +722,53 @@
     </div>
   </header>
 
+
+  {% if cafe_settings and cafe_settings.site_notice %}
+    <div style="background:#fff8e1;border-bottom:1px solid #f0e0a0;">
+      <div class="container" style="padding-top:10px;padding-bottom:10px;">
+        <div style="font-weight:600;">{{ cafe_settings.site_notice }}</div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if cafe_settings and not cafe_is_open_now %}
+    <div style="background:#fff3f2;border-bottom:1px solid #f3b7b2;">
+      <div class="container" style="padding-top:10px;padding-bottom:10px;">
+        <div style="font-weight:600;">
+          Сейчас кафе закрыто. Заказы принимаются в часы работы:
+          {{ cafe_settings.working_hours_text|default:"по расписанию" }}.
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+
   {% block hero_full %}{% endblock %}
 
   <main>
     <div class="container">
+      {% if messages %}
+        <div style="display:grid;gap:10px;margin-bottom:16px;">
+          {% for message in messages %}
+            <div
+              class="panel"
+              style="
+                padding:12px 14px;
+                border-color:
+                  {% if message.tags == 'error' %}#f3b7b2
+                  {% elif message.tags == 'success' %}#b7dfc0
+                  {% else %}#ddd{% endif %};
+                background:
+                  {% if message.tags == 'error' %}#fff3f2
+                  {% elif message.tags == 'success' %}#eef8f0
+                  {% else %}#fff{% endif %};
+              "
+            >
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
       <div class="page-section">
         {% block content %}{% endblock %}
       </div>
@@ -731,9 +781,30 @@
         <div>
           <div class="footer-title">Кафе «Сказка»</div>
           <div class="footer-list" style="color:rgba(255,255,255,.85);">
-            <div>Доставка и самовывоз</div>
-            <div>Ежедневное меню</div>
-            <div>Бизнес-ланчи, банкеты, выездной кейтеринг</div>
+            <div>
+              Телефон:
+              {% if cafe_settings and cafe_settings.phone %}
+                {{ cafe_settings.phone }}
+              {% else %}
+                +7 (000) 000-00-00
+              {% endif %}
+            </div>
+            <div>
+              Адрес:
+              {% if cafe_settings and cafe_settings.address_text %}
+                {{ cafe_settings.address_text }}
+              {% else %}
+                будет указан позже
+              {% endif %}
+            </div>
+            <div>
+              Режим работы:
+              {% if cafe_settings and cafe_settings.working_hours_text %}
+                {{ cafe_settings.working_hours_text }}
+              {% else %}
+                будет настроен позже
+              {% endif %}
+            </div>
           </div>
         </div>
 
@@ -750,7 +821,14 @@
         <div>
           <div class="footer-title">Контакты</div>
           <div class="footer-list" style="color:rgba(255,255,255,.85);">
-            <div>Телефон: +7 (000) 000-00-00</div>
+            <div>
+              Телефон:
+              {% if cafe_settings and cafe_settings.phone %}
+                {{ cafe_settings.phone }}
+              {% else %}
+                +7 (000) 000-00-00
+              {% endif %}
+            </div>
             <div>Адрес: г. Ижевск, улица Графа Шувалова, 4Б</div>
             <div>Режим работы: пн-вс 10:00-23:00</div>
           </div>

@@ -88,9 +88,23 @@
       {% endfor %}
     </div>
 
-    <div class="order-total-row">
+    {% comment %} <div class="order-total-row">
       <div class="muted">Итого</div>
       <div style="font-size:24px;font-weight:700;">{{ total }} ₽</div>
+    </div> {% endcomment %}
+    <div class="order-total-row">
+      <div class="muted">Товары</div>
+      <div><span id="checkout-items-total">{{ items_total }}</span> ₽</div>
+    </div>
+
+    <div class="order-total-row" style="margin-top:0;padding-top:0;border-top:none;">
+      <div class="muted">Доставка</div>
+      <div><span id="checkout-delivery-fee">{{ delivery_fee }}</span> ₽</div>
+    </div>
+
+    <div class="order-total-row">
+      <div class="muted">Итого</div>
+      <div style="font-size:24px;font-weight:700;"><span id="checkout-grand-total">{{ grand_total }}</span> ₽</div>
     </div>
 
     <div style="display:grid;gap:10px;margin-top:16px;">
@@ -109,10 +123,31 @@
   const deliveryFields = document.getElementById("delivery-fields");
   const phoneInput = form.querySelector('[name="customer_phone"]');
 
+
+  const itemsTotalEl = document.getElementById("checkout-items-total");
+  const deliveryFeeEl = document.getElementById("checkout-delivery-fee");
+  const grandTotalEl = document.getElementById("checkout-grand-total");
+
+  const deliveryFeeValue = Number("{{ cafe_settings.delivery_fee|default:0 }}".replace(",", "."));
+  const itemsTotalValue = Number("{{ items_total }}".replace(",", "."));
+
+  function syncTotals() {
+    if (!fulfillmentField || !itemsTotalEl || !deliveryFeeEl || !grandTotalEl) return;
+
+    const isDelivery = fulfillmentField.value === "delivery";
+    const fee = isDelivery ? deliveryFeeValue : 0;
+    const grand = itemsTotalValue + fee;
+
+    deliveryFeeEl.textContent = fee.toFixed(2);
+    grandTotalEl.textContent = grand.toFixed(2);
+  }
+
+
   function syncDeliveryFields() {
     if (!fulfillmentField || !deliveryFields) return;
     const isDelivery = fulfillmentField.value === "delivery";
     deliveryFields.style.display = isDelivery ? "grid" : "none";
+    syncTotals();
   }
 
   function extractDigits(value) {
@@ -160,6 +195,7 @@
   if (fulfillmentField) {
     fulfillmentField.addEventListener("change", syncDeliveryFields);
     syncDeliveryFields();
+    syncTotals();
   }
 
   if (phoneInput) {

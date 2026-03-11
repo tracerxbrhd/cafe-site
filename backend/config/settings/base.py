@@ -48,6 +48,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 # local templates
                 "orders.context_processors.cart_info",
+                "core.context_processors.cafe_settings",
             ],
         },
     },

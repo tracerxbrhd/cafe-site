@@ -13,6 +13,9 @@ from integrations.telegram.client import send_message, TelegramError
 from .notifications import format_new_order_message, build_order_status_keyboard
 import logging
 
+from core.utils import get_cafe_settings, get_delivery_fee
+from django.contrib import messages
+
 from .cart import _get_cart_dict, cart_get_qty  # добавь импорт (или сделай отдельную функцию cart_get_qty)
 
 from .cart import cart_add, cart_clear, cart_count, cart_lines, cart_set
@@ -68,41 +71,61 @@ def cart_api_clear(request):
 
 @require_http_methods(["GET", "POST"])
 def checkout_page(request):
-    lines, total = cart_lines(request.session)
+    lines, items_total = cart_lines(request.session)
     if not lines:
         return redirect("orders:cart")
+
+    cafe_settings = get_cafe_settings()
+
+    if cafe_settings:
+        if not cafe_settings.is_currently_open():
+            messages.error(
+                request,
+                f"Сейчас приём заказов недоступен. Режим работы: {cafe_settings.working_hours_text}."
+            )
+            return redirect("orders:cart")
 
     if request.method == "POST":
         form = CheckoutForm(request.POST)
         if form.is_valid():
-            order = Order.objects.create(
-                status=Order.Status.NEW,
-                fulfillment=form.cleaned_data["fulfillment"],
-                customer_name=form.cleaned_data["customer_name"],
-                customer_phone=form.cleaned_data["customer_phone"],
-                customer_comment=form.cleaned_data.get("customer_comment", "") or "",
-                address_line=form.cleaned_data.get("address_line", "") or "",
-                address_entrance=form.cleaned_data.get("address_entrance", "") or "",
-                address_floor=form.cleaned_data.get("address_floor", "") or "",
-                address_apartment=form.cleaned_data.get("address_apartment", "") or "",
-                total=Decimal("0.00"),
-            )
+            fulfillment = form.cleaned_data["fulfillment"]
+            delivery_fee = get_delivery_fee(fulfillment)
+            grand_total = items_total + delivery_fee
 
-            # Создаём позиции из корзины
-            order_total = Decimal("0.00")
-            for line in lines:
-                item = OrderItem.objects.create(
-                    order=order,
-                    product=line.product,
-                    product_name=line.product.name,
-                    unit_price=line.product.price,
-                    quantity=line.qty,
-                    line_total=line.line_total,
+            if cafe_settings and grand_total < cafe_settings.min_order_amount:
+                form.add_error(
+                    None,
+                    f"Минимальная сумма заказа: {cafe_settings.min_order_amount} ₽."
                 )
-                order_total += item.line_total
+            else:
+                order = Order.objects.create(
+                    status=Order.Status.NEW,
+                    fulfillment=fulfillment,
+                    customer_name=form.cleaned_data["customer_name"],
+                    customer_phone=form.cleaned_data["customer_phone"],
+                    customer_comment=form.cleaned_data.get("customer_comment", "") or "",
+                    address_line=form.cleaned_data.get("address_line", "") or "",
+                    address_entrance=form.cleaned_data.get("address_entrance", "") or "",
+                    address_floor=form.cleaned_data.get("address_floor", "") or "",
+                    address_apartment=form.cleaned_data.get("address_apartment", "") or "",
+                    total=Decimal("0.00"),
+                )
 
-            order.total = order_total.quantize(Decimal("0.01"))
-            order.save(update_fields=["total"])
+                order_total = Decimal("0.00")
+                for line in lines:
+                    item = OrderItem.objects.create(
+                        order=order,
+                        product=line.product,
+                        product_name=line.product.name,
+                        unit_price=line.product.price,
+                        quantity=line.qty,
+                        line_total=line.line_total,
+                    )
+                    order_total += item.line_total
+
+                order_total += delivery_fee
+                order.total = order_total.quantize(Decimal("0.01"))
+                order.save(update_fields=["total"])
 
 
             logger = logging.getLogger(__name__)
@@ -133,7 +156,28 @@ def checkout_page(request):
     else:
         form = CheckoutForm()
 
-    return render(request, "orders/checkout.html", {"form": form, "lines": lines, "total": total})
+
+    selected_fulfillment = (
+        form.data.get("fulfillment")
+        if request.method == "POST"
+        else Order.Fulfillment.DELIVERY
+    )
+
+    delivery_fee = get_delivery_fee(selected_fulfillment)
+    grand_total = items_total + delivery_fee
+
+    # return render(request, "orders/checkout.html", {"form": form, "lines": lines, "total": total})
+    return render(
+        request,
+        "orders/checkout.html",
+        {
+            "form": form,
+            "lines": lines,
+            "items_total": items_total,
+            "delivery_fee": delivery_fee,
+            "grand_total": grand_total,
+        },
+    )
 
 
 def order_status_page(request, public_id):
