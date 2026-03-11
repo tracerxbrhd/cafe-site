@@ -201,6 +201,11 @@ class OrderAdmin(admin.ModelAdmin):
                     "address_entrance",
                     "address_floor",
                     "address_apartment",
+                    "delivery_zone_name",
+                    "delivery_zone_code",
+                    "delivery_fee",
+                    "delivery_lat",
+                    "delivery_lon",
                 )
             },
         ),
@@ -573,6 +578,11 @@ class OrderAdmin(admin.ModelAdmin):
             "telegram_chat_id",
             "telegram_message_id",
             "status_controls",
+            "delivery_lat",
+            "delivery_lon",
+            "delivery_zone_code",
+            "delivery_zone_name",
+            "delivery_fee",
         ]
 
         if request.user.is_superuser:

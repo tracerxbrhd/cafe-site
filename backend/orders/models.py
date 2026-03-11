@@ -32,6 +32,39 @@ class Order(models.Model):
 
     total = models.DecimalField("Итого", max_digits=10, decimal_places=2, default=0)
 
+    delivery_lat = models.DecimalField(
+        "Широта доставки",
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    delivery_lon = models.DecimalField(
+        "Долгота доставки",
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+
+    delivery_zone_code = models.CharField(
+        "Код зоны доставки",
+        max_length=64,
+        blank=True,
+    )
+    delivery_zone_name = models.CharField(
+        "Название зоны доставки",
+        max_length=120,
+        blank=True,
+    )
+
+    delivery_fee = models.DecimalField(
+        "Стоимость доставки",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+
     telegram_chat_id = models.CharField("Telegram chat id", max_length=64, blank=True)
     telegram_message_id = models.BigIntegerField("Telegram message id", null=True, blank=True)
 

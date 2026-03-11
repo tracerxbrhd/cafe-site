@@ -413,6 +413,11 @@ def checkout_page(request):
                 address_entrance=form.cleaned_data.get("address_entrance", "") or "",
                 address_floor=form.cleaned_data.get("address_floor", "") or "",
                 address_apartment=form.cleaned_data.get("address_apartment", "") or "",
+                delivery_lat=Decimal(str(delivery_lat)).quantize(Decimal("0.000001")) if delivery_lat is not None else None,
+                delivery_lon=Decimal(str(delivery_lon)).quantize(Decimal("0.000001")) if delivery_lon is not None else None,
+                delivery_zone_code=quote.zone.code if quote and quote.zone else "",
+                delivery_zone_name=quote.zone.name if quote and quote.zone else "",
+                delivery_fee=delivery_fee,
                 total=Decimal("0.00"),
             )
 

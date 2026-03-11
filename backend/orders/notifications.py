@@ -64,6 +64,10 @@ def format_new_order_message(order: Order) -> str:
             extra.append(f"этаж {order.address_floor}")
         if order.address_apartment:
             extra.append(f"кв/офис {order.address_apartment}")
+        if order.delivery_zone_name:
+            lines.append(f"<b>Зона доставки:</b> {order.delivery_zone_name}")
+        if order.delivery_fee:
+            lines.append(f"<b>Доставка:</b> {order.delivery_fee} ₽")
         if extra:
             addr = f"{addr} ({', '.join(extra)})"
         lines.append(f"<b>Адрес:</b> {addr}")
