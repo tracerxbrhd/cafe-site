@@ -46,6 +46,8 @@
         <div class="form-row">
           <label class="form-label" for="{{ form.address_line.id_for_label }}">Адрес доставки</label>
           {{ form.address_line }}
+          {{ form.delivery_lat }}
+          {{ form.delivery_lon }}
           {% if form.address_line.errors %}
             <div class="form-error">{{ form.address_line.errors }}</div>
           {% endif %}
@@ -67,6 +69,18 @@
             {{ form.address_apartment }}
           </div>
         </div>
+
+        <div id="delivery-quote-box" class="notice-box" style="display:none;">
+          <div><b>Зона доставки:</b> <span id="delivery-zone-name">—</span></div>
+          <div><b>Стоимость доставки:</b> <span id="delivery-zone-fee">0.00</span> ₽</div>
+          <div><b>Минимальная сумма:</b> <span id="delivery-zone-min">0.00</span> ₽</div>
+          <div id="delivery-zone-error" class="form-error" style="display:none;"></div>
+        </div>
+
+        <div
+          id="checkout-map"
+          style="width:100%;height:360px;border:1px solid #ddd;border-radius:12px;overflow:hidden;background:#f3f3f3;"
+        ></div>
       </div>
 
       <div class="form-row">
@@ -114,6 +128,14 @@
   </aside>
 </div>
 
+
+{% comment %} {% if cafe_settings and cafe_settings.yandex_maps_api_key %}
+  <script src="https://api-maps.yandex.ru/2.1/?apikey={{ cafe_settings.yandex_maps_api_key }}&lang=ru_RU"></script>
+{% endif %} {% endcomment %}
+{% if cafe_settings and cafe_settings.yandex_maps_api_key %}
+  <script src="https://api-maps.yandex.ru/2.1/?apikey={{ cafe_settings.yandex_maps_api_key }}{% if cafe_settings.yandex_suggest_api_key %}&suggest_apikey={{ cafe_settings.yandex_suggest_api_key }}{% endif %}&lang=ru_RU"></script>
+{% endif %}
+
 <script>
 (function() {
   const form = document.getElementById("checkout-form");
@@ -123,25 +145,29 @@
   const deliveryFields = document.getElementById("delivery-fields");
   const phoneInput = form.querySelector('[name="customer_phone"]');
 
+  const addressInput = form.querySelector('[name="address_line"]');
+  const latInput = form.querySelector('[name="delivery_lat"]');
+  const lonInput = form.querySelector('[name="delivery_lon"]');
 
   const itemsTotalEl = document.getElementById("checkout-items-total");
   const deliveryFeeEl = document.getElementById("checkout-delivery-fee");
   const grandTotalEl = document.getElementById("checkout-grand-total");
 
-  const deliveryFeeValue = Number("{{ cafe_settings.delivery_fee|default:0 }}".replace(",", "."));
+  const quoteBox = document.getElementById("delivery-quote-box");
+  const zoneNameEl = document.getElementById("delivery-zone-name");
+  const zoneFeeEl = document.getElementById("delivery-zone-fee");
+  const zoneMinEl = document.getElementById("delivery-zone-min");
+  const zoneErrorEl = document.getElementById("delivery-zone-error");
+
+  const quoteUrl = "{% url 'orders:api_delivery_quote' %}";
   const itemsTotalValue = Number("{{ items_total }}".replace(",", "."));
+  const defaultMinOrder = Number("{{ cafe_settings.min_order_amount|default:0 }}".replace(",", "."));
 
-  function syncTotals() {
-    if (!fulfillmentField || !itemsTotalEl || !deliveryFeeEl || !grandTotalEl) return;
-
-    const isDelivery = fulfillmentField.value === "delivery";
-    const fee = isDelivery ? deliveryFeeValue : 0;
-    const grand = itemsTotalValue + fee;
-
-    deliveryFeeEl.textContent = fee.toFixed(2);
-    grandTotalEl.textContent = grand.toFixed(2);
-  }
-
+  let mapInstance = null;
+  let placemark = null;
+  let suggestView = null;
+  let currentDeliveryFee = Number("{{ delivery_fee|default:0 }}".replace(",", "."));
+  let currentMinOrderAmount = defaultMinOrder;
 
   function syncDeliveryFields() {
     if (!fulfillmentField || !deliveryFields) return;
@@ -150,13 +176,22 @@
     syncTotals();
   }
 
+  function syncTotals() {
+    if (!itemsTotalEl || !deliveryFeeEl || !grandTotalEl) return;
+    const isDelivery = fulfillmentField && fulfillmentField.value === "delivery";
+    const fee = isDelivery ? currentDeliveryFee : 0;
+    const grand = itemsTotalValue + fee;
+
+    deliveryFeeEl.textContent = fee.toFixed(2);
+    grandTotalEl.textContent = grand.toFixed(2);
+  }
+
   function extractDigits(value) {
     return (value || "").replace(/\D/g, "");
   }
 
   function normalizePhoneDigits(rawDigits) {
     let digits = rawDigits;
-
     if (!digits) return "7";
 
     if (digits.startsWith("8")) {
@@ -192,10 +227,199 @@
     }
   }
 
+  async function requestQuote(lat, lon) {
+    if (!lat || !lon) return;
+
+    const body = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      fulfillment: fulfillmentField ? fulfillmentField.value : "delivery",
+    });
+
+    const csrftoken = document.cookie
+      .split("; ")
+      .find(v => v.startsWith("csrftoken="))
+      ?.split("=")[1] || "";
+
+    const resp = await fetch(quoteUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRFToken": csrftoken,
+      },
+      body: body.toString(),
+    });
+
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+
+    return await resp.json();
+  }
+
+  function renderQuote(data) {
+    if (!quoteBox || !zoneNameEl || !zoneFeeEl || !zoneMinEl || !zoneErrorEl) return;
+
+    quoteBox.style.display = "block";
+
+    if (!data.ok || !data.is_deliverable) {
+      zoneNameEl.textContent = data.zone_name || "вне зоны";
+      zoneFeeEl.textContent = data.delivery_fee || "0.00";
+      zoneMinEl.textContent = data.min_order_amount || "0.00";
+      zoneErrorEl.textContent = data.reason || "Адрес вне зоны доставки";
+      zoneErrorEl.style.display = "block";
+
+      currentDeliveryFee = 0;
+      currentMinOrderAmount = Number(data.min_order_amount || defaultMinOrder);
+      syncTotals();
+      return;
+    }
+
+    zoneNameEl.textContent = data.zone_name || "определена";
+    zoneFeeEl.textContent = data.delivery_fee || "0.00";
+    zoneMinEl.textContent = data.min_order_amount || "0.00";
+    zoneErrorEl.textContent = "";
+    zoneErrorEl.style.display = "none";
+
+    currentDeliveryFee = Number(String(data.delivery_fee || "0").replace(",", "."));
+    currentMinOrderAmount = Number(String(data.min_order_amount || defaultMinOrder).replace(",", "."));
+    syncTotals();
+  }
+
+  async function updateQuoteByCoords(lat, lon) {
+    latInput.value = String(lat);
+    lonInput.value = String(lon);
+
+    try {
+      const data = await requestQuote(lat, lon);
+      renderQuote(data);
+    } catch (err) {
+      console.error("delivery quote error:", err);
+      if (quoteBox) quoteBox.style.display = "block";
+      if (zoneErrorEl) {
+        zoneErrorEl.textContent = "Не удалось определить стоимость доставки";
+        zoneErrorEl.style.display = "block";
+      }
+    }
+  }
+
+  function initYandexMap() {
+    if (!window.ymaps || !addressInput) return;
+
+    ymaps.ready(function() {
+      const initialCenter = [56.934096, 53.289452];
+
+      mapInstance = new ymaps.Map("checkout-map", {
+        center: initialCenter,
+        zoom: 11,
+        controls: ["zoomControl", "fullscreenControl"],
+      });
+
+      placemark = new ymaps.Placemark(initialCenter, {}, {
+        preset: "islands#redDotIcon",
+        draggable: true,
+      });
+
+      mapInstance.geoObjects.add(placemark);
+
+      /// suggestView = new ymaps.SuggestView(addressInput.id);
+      try {
+        suggestView = new ymaps.SuggestView(addressInput.id);
+      } catch (err) {
+        console.error("SuggestView init error:", err);
+      }
+
+      suggestView.events.add("select", function(e) {
+        const item = e.get("item");
+        const value = item && (item.value || item.displayName) ? (item.value || item.displayName) : addressInput.value;
+
+        ymaps.geocode(value, { results: 1 }).then(function(res) {
+          const first = res.geoObjects.get(0);
+          if (!first) return;
+
+          const coords = first.geometry.getCoordinates();
+          const text =
+            first.getAddressLine && typeof first.getAddressLine === "function"
+              ? first.getAddressLine()
+              : first.properties.get("text") || value;
+
+          addressInput.value = text;
+          placemark.geometry.setCoordinates(coords);
+          mapInstance.setCenter(coords, 16, { duration: 200 });
+          updateQuoteByCoords(coords[0], coords[1]);
+        }).catch(function(err) {
+          console.error("suggest geocode error:", err);
+        });
+      });
+
+      mapInstance.events.add("click", function(e) {
+        const coords = e.get("coords");
+        placemark.geometry.setCoordinates(coords);
+
+        ymaps.geocode(coords, { results: 1 }).then(function(res) {
+          const first = res.geoObjects.get(0);
+          if (first) {
+            const text =
+              first.getAddressLine && typeof first.getAddressLine === "function"
+                ? first.getAddressLine()
+                : first.properties.get("text") || addressInput.value;
+
+            if (text) {
+              addressInput.value = text;
+            }
+          }
+
+          updateQuoteByCoords(coords[0], coords[1]);
+        }).catch(function(err) {
+          console.error("map click geocode error:", err);
+        });
+      });
+
+      placemark.events.add("dragend", function() {
+        const coords = placemark.geometry.getCoordinates();
+
+        ymaps.geocode(coords, { results: 1 }).then(function(res) {
+          const first = res.geoObjects.get(0);
+          if (first) {
+            const text =
+              first.getAddressLine && typeof first.getAddressLine === "function"
+                ? first.getAddressLine()
+                : first.properties.get("text") || addressInput.value;
+
+            if (text) {
+              addressInput.value = text;
+            }
+          }
+
+          updateQuoteByCoords(coords[0], coords[1]);
+        }).catch(function(err) {
+          console.error("drag geocode error:", err);
+        });
+      });
+
+      const existingLat = parseFloat(latInput.value || "");
+      const existingLon = parseFloat(lonInput.value || "");
+      if (!Number.isNaN(existingLat) && !Number.isNaN(existingLon)) {
+        const coords = [existingLat, existingLon];
+        placemark.geometry.setCoordinates(coords);
+        mapInstance.setCenter(coords, 16, { duration: 0 });
+        updateQuoteByCoords(existingLat, existingLon);
+      }
+    });
+  }
+
   if (fulfillmentField) {
     fulfillmentField.addEventListener("change", syncDeliveryFields);
+    fulfillmentField.addEventListener("change", function() {
+      syncTotals();
+      const lat = parseFloat(latInput.value || "");
+      const lon = parseFloat(lonInput.value || "");
+      if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+        updateQuoteByCoords(lat, lon);
+      }
+    });
     syncDeliveryFields();
-    syncTotals();
   }
 
   if (phoneInput) {
@@ -218,7 +442,6 @@
 
     phoneInput.addEventListener("keydown", function(e) {
       const value = phoneInput.value;
-
       if ((e.key === "Backspace" || e.key === "Delete") && value.length <= 2) {
         e.preventDefault();
       }
@@ -228,6 +451,9 @@
       phoneInput.value = formatPhone(phoneInput.value);
     }
   }
+
+  syncTotals();
+  initYandexMap();
 })();
 </script>
 {% endblock %}

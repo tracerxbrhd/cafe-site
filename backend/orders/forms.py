@@ -31,6 +31,9 @@ class CheckoutForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 3}),
     )
 
+    delivery_lat = forms.CharField(required=False, widget=forms.HiddenInput())
+    delivery_lon = forms.CharField(required=False, widget=forms.HiddenInput())
+
     def clean_customer_name(self):
         value = (self.cleaned_data.get("customer_name") or "").strip()
         if len(value) < 2:
@@ -62,10 +65,18 @@ class CheckoutForm(forms.Form):
         if fulfillment == Order.Fulfillment.DELIVERY:
             if not (cleaned.get("address_line") or "").strip():
                 self.add_error("address_line", "Для доставки нужен адрес.")
+
+            lat = (cleaned.get("delivery_lat") or "").strip()
+            lon = (cleaned.get("delivery_lon") or "").strip()
+
+            if not lat or not lon:
+                self.add_error("address_line", "Нужно выбрать точку доставки на карте или через адрес.")
         else:
             cleaned["address_line"] = ""
             cleaned["address_entrance"] = ""
             cleaned["address_floor"] = ""
             cleaned["address_apartment"] = ""
+            cleaned["delivery_lat"] = ""
+            cleaned["delivery_lon"] = ""
 
         return cleaned
