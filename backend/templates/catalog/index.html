@@ -395,6 +395,73 @@
   {% endif %}
 </section>
 
+<section style="margin-top:48px;">
+  <div class="contact-map-grid">
+    <div class="panel contact-map-card">
+      <h2 class="section-title" style="font-size:28px;margin-bottom:14px;">Как нас найти</h2>
+
+      <div style="display:grid;gap:14px;line-height:1.6;">
+        <div>
+          <div class="muted" style="font-size:13px;">Локация</div>
+          <div><b>г. Ижевск, кафе «Сказка»</b></div>
+        </div>
+
+        <div>
+          <div class="muted" style="font-size:13px;">Телефон</div>
+          <div><b><a href="tel:+70000000000" style="text-decoration:none;">+7 (000) 000-00-00</a></b></div>
+        </div>
+
+        <div>
+          <div class="muted" style="font-size:13px;">Режим работы</div>
+          <div><b>Ежедневно, 10:00–22:00</b></div>
+        </div>
+
+        <div>
+          <div class="muted" style="font-size:13px;">О нас</div>
+          <div style="max-width:420px;">
+            Доставка, самовывоз, бизнес-ланчи, банкеты и выездной кейтеринг.
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+          <a
+            href="https://yandex.ru/maps/?ll=53.289452%2C56.934096&z=17&pt=53.289452,56.934096,pm2rdm"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-primary"
+          >
+            Открыть в Яндекс Картах
+          </a>
+
+          <a
+            href="https://yandex.ru/maps/?rtext=~56.934096,53.289452"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn"
+          >
+            Построить маршрут
+          </a>
+
+          <a
+            href="tel:+70000000000"
+            class="btn"
+          >
+            Позвонить
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="padding:0;overflow:hidden;">
+      <iframe
+        class="contact-map-frame"
+        src="https://yandex.ru/map-widget/v1/?ll=53.289452%2C56.934096&z=17&pt=53.289452,56.934096,pm2rdm"
+        allowfullscreen="true"
+      ></iframe>
+    </div>
+  </div>
+</section>
+
 <script>
 (function() {
   const filtersWrap = document.getElementById("category-filters");
