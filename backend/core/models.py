@@ -184,3 +184,40 @@ class BusinessLunchItem(models.Model):
 
     def __str__(self):
         return self.name
+    
+
+class ServicePage(models.Model):
+    class PageType(models.TextChoices):
+        BANQUETS = "banquets", "Банкеты"
+        CATERING = "catering", "Кейтеринг"
+
+    page_type = models.CharField(
+        "Тип страницы",
+        max_length=32,
+        choices=PageType.choices,
+        unique=True,
+    )
+
+    title = models.CharField("Заголовок", max_length=160)
+    subtitle = models.TextField("Подзаголовок", blank=True)
+
+    content = models.TextField("Основной текст", blank=True)
+    features = models.TextField(
+        "Преимущества / условия",
+        blank=True,
+        help_text="По одному пункту с новой строки.",
+    )
+
+    cta_title = models.CharField("Заголовок CTA", max_length=160, blank=True)
+    cta_text = models.TextField("Текст CTA", blank=True)
+
+    is_published = models.BooleanField("Опубликовано", default=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Страница услуги"
+        verbose_name_plural = "Страницы услуг"
+        ordering = ["page_type"]
+
+    def __str__(self):
+        return self.get_page_type_display()

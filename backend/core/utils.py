@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Iterable
 from django.utils import timezone
 
-from .models import CafeSettings, DeliveryZone, BusinessLunchMenu
+from .models import CafeSettings, DeliveryZone, BusinessLunchMenu, ServicePage
 
 
 def get_cafe_settings():
@@ -133,5 +133,13 @@ def get_current_business_lunch_menu():
         )
         .prefetch_related("items")
         .order_by("-week_start", "sort_order", "-id")
+        .first()
+    )
+
+
+def get_service_page(page_type: str):
+    return (
+        ServicePage.objects.filter(page_type=page_type, is_published=True)
+        .order_by("id")
         .first()
     )

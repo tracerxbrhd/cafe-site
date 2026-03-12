@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CafeSettings, DeliveryZone, BusinessLunchMenu, BusinessLunchItem
+from .models import CafeSettings, DeliveryZone, BusinessLunchMenu, BusinessLunchItem, ServicePage
 
 
 @admin.register(CafeSettings)
@@ -56,3 +56,10 @@ class BusinessLunchMenuAdmin(admin.ModelAdmin):
     ordering = ("-week_start", "sort_order")
     prepopulated_fields = {"slug": ("title",)}
     inlines = [BusinessLunchItemInline]
+
+
+@admin.register(ServicePage)
+class ServicePageAdmin(admin.ModelAdmin):
+    list_display = ("page_type", "title", "is_published", "updated_at")
+    list_filter = ("page_type", "is_published")
+    search_fields = ("title", "subtitle", "content", "features", "cta_title", "cta_text")

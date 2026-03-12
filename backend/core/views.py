@@ -1,6 +1,6 @@
 from django.shortcuts import render
-from .models import BusinessLunchMenu
-from .utils import get_current_business_lunch_menu
+from .models import BusinessLunchMenu, ServicePage
+from .utils import get_current_business_lunch_menu, get_service_page
 
 
 def business_lunches_page(request):
@@ -22,8 +22,10 @@ def business_lunches_page(request):
 
 
 def banquets_page(request):
-    return render(request, "core/banquets.html")
+    page = get_service_page(ServicePage.PageType.BANQUETS)
+    return render(request, "core/service_page.html", {"page": page, "page_kind": "banquets"})
 
 
 def catering_page(request):
-    return render(request, "core/catering.html")
+    page = get_service_page(ServicePage.PageType.CATERING)
+    return render(request, "core/service_page.html", {"page": page, "page_kind": "catering"})

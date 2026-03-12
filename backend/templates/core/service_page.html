@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if page %}{{ page.title }} — Сказка{% else %}Услуги — Сказка{% endif %}
+{% endblock %}
+
+{% block content %}
+  {% if page %}
+    <section style="margin-bottom:28px;">
+      <div class="panel">
+        <h1 class="section-title" style="margin-bottom:10px;">{{ page.title }}</h1>
+
+        {% if page.subtitle %}
+          <div style="font-size:18px;line-height:1.6;max-width:900px;margin-bottom:18px;">
+            {{ page.subtitle|linebreaksbr }}
+          </div>
+        {% endif %}
+
+        {% if page.content %}
+          <div style="line-height:1.7;max-width:920px;margin-bottom:22px;">
+            {{ page.content|linebreaks }}
+          </div>
+        {% endif %}
+
+        {% if page.features %}
+          <div class="panel" style="background:#fcfcfc;">
+            <div style="font-size:20px;font-weight:700;margin-bottom:12px;">Условия и преимущества</div>
+
+            <div style="display:grid;gap:8px;">
+              {% for line in page.features.splitlines %}
+                {% if line.strip %}
+                  <div>• {{ line }}</div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if page.cta_title or page.cta_text %}
+      <section>
+        <div class="panel">
+          {% if page.cta_title %}
+            <div style="font-size:24px;font-weight:800;margin-bottom:10px;">{{ page.cta_title }}</div>
+          {% endif %}
+
+          {% if page.cta_text %}
+            <div style="line-height:1.65;max-width:820px;margin-bottom:16px;">
+              {{ page.cta_text|linebreaks }}
+            </div>
+          {% endif %}
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            {% if cafe_settings and cafe_settings.phone %}
+              <a href="tel:{{ cafe_settings.phone|cut:' '|cut:'('|cut:')'|cut:'-' }}" class="btn btn-primary">
+                Позвонить
+              </a>
+            {% endif %}
+            <a href="{% url 'catalog:index' %}" class="btn-link">Перейти в меню</a>
+          </div>
+        </div>
+      </section>
+    {% endif %}
+  {% else %}
+    <div class="panel">
+      <h1 class="section-title">
+        {% if page_kind == "banquets" %}Банкеты{% else %}Выездной кейтеринг{% endif %}
+      </h1>
+      <div class="muted">
+        Страница пока не заполнена в админке.
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
