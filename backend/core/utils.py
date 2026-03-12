@@ -2,8 +2,9 @@ import json
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Iterable
+from django.utils import timezone
 
-from .models import CafeSettings, DeliveryZone
+from .models import CafeSettings, DeliveryZone, BusinessLunchMenu
 
 
 def get_cafe_settings():
@@ -117,4 +118,20 @@ def get_delivery_quote(lat: float, lon: float, fulfillment: str) -> DeliveryQuot
         delivery_fee=default_fee,
         min_order_amount=default_min,
         reason="Адрес вне зоны доставки",
+    )
+
+
+def get_current_business_lunch_menu():
+    today = timezone.localdate()
+
+    return (
+        BusinessLunchMenu.objects.filter(
+            is_active=True,
+            is_published=True,
+            week_start__lte=today,
+            week_end__gte=today,
+        )
+        .prefetch_related("items")
+        .order_by("-week_start", "sort_order", "-id")
+        .first()
     )

@@ -4,13 +4,97 @@
 {% block content %}
 <h1 class="section-title">Бизнес-ланчи</h1>
 
-<div class="panel" style="max-width:860px;">
-  <p style="margin-top:0;line-height:1.65;">
-    Здесь будет размещаться актуальное недельное предложение бизнес-ланчей.
-  </p>
+{% if current_menu %}
+  <section style="margin-bottom:36px;">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;gap:16px;align-items:end;flex-wrap:wrap;margin-bottom:14px;">
+        <div>
+          <div class="muted" style="font-size:13px;margin-bottom:6px;">Актуальное предложение недели</div>
+          <h2 style="margin:0 0 6px;font-size:28px;">{{ current_menu.title }}</h2>
+          <div class="muted">{{ current_menu.week_start }} — {{ current_menu.week_end }}</div>
+        </div>
+      </div>
 
-  <p class="muted" style="line-height:1.65;">
-    Раздел будет доработан следующим этапом: отдельное меню недели, сроки действия, условия для юридических и физических лиц.
-  </p>
-</div>
+      {% if current_menu.description %}
+        <div style="line-height:1.6;margin-bottom:18px;">
+          {{ current_menu.description|linebreaks }}
+        </div>
+      {% endif %}
+
+      {% if current_menu.items.all %}
+        <div class="catalog-grid">
+          {% for item in current_menu.items.all %}
+            <article class="card product-card">
+              {% if item.image %}
+                <div class="product-card-media">
+                  <img src="{{ item.image.url }}" alt="{{ item.name }}">
+                </div>
+              {% else %}
+                <div class="product-card-media" style="display:flex;align-items:center;justify-content:center;opacity:.55;">
+                  Нет фото
+                </div>
+              {% endif %}
+
+              <div class="card-body" style="display:flex;flex-direction:column;gap:10px;flex:1;">
+                <div class="product-card-title">{{ item.name }}</div>
+
+                {% if item.description %}
+                  <div class="product-card-desc">
+                    {{ item.description|linebreaksbr }}
+                  </div>
+                {% endif %}
+
+                <div class="product-card-footer">
+                  <div class="price-block">
+                    <div class="price-main">{{ item.price }} ₽</div>
+                  </div>
+                </div>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </section>
+{% else %}
+  <div class="panel" style="margin-bottom:32px;">
+    <div style="font-size:20px;font-weight:700;margin-bottom:8px;">Актуальное меню бизнес-ланчей пока не опубликовано</div>
+    <div class="muted">После публикации меню недели оно появится здесь.</div>
+  </div>
+{% endif %}
+
+{% if archive_menus %}
+  <section>
+    <h2 style="margin:0 0 16px;font-size:24px;">Архив и другие недели</h2>
+
+    <div style="display:grid;gap:16px;">
+      {% for menu in archive_menus %}
+        <article class="panel">
+          <div style="display:flex;justify-content:space-between;gap:16px;align-items:end;flex-wrap:wrap;margin-bottom:10px;">
+            <div>
+              <div style="font-size:20px;font-weight:700;">{{ menu.title }}</div>
+              <div class="muted">{{ menu.week_start }} — {{ menu.week_end }}</div>
+            </div>
+
+            {% if current_menu and menu.id == current_menu.id %}
+              <div class="status-badge">Текущая неделя</div>
+            {% endif %}
+          </div>
+
+          {% if menu.description %}
+            <div class="muted" style="margin-bottom:10px;line-height:1.5;">
+              {{ menu.description|truncatechars:220 }}
+            </div>
+          {% endif %}
+
+          <div style="display:grid;gap:6px;">
+            {% for item in menu.items.all|slice:":5" %}
+              <div>• {{ item.name }} — {{ item.price }} ₽</div>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
 {% endblock %}

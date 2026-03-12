@@ -128,3 +128,59 @@ class DeliveryZone(models.Model):
 
     def __str__(self):
         return self.name
+    
+
+class BusinessLunchMenu(models.Model):
+    title = models.CharField("Заголовок", max_length=160)
+    slug = models.SlugField("Slug", max_length=180, unique=True)
+
+    description = models.TextField("Описание", blank=True)
+
+    week_start = models.DateField("Начало недели")
+    week_end = models.DateField("Конец недели")
+
+    is_active = models.BooleanField("Активно", default=True)
+    is_published = models.BooleanField("Опубликовано", default=True)
+
+    sort_order = models.PositiveIntegerField("Сортировка", default=100)
+
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Меню бизнес-ланчей"
+        verbose_name_plural = "Меню бизнес-ланчей"
+        ordering = ["-week_start", "sort_order", "-id"]
+
+    def __str__(self):
+        return f"{self.title} ({self.week_start} — {self.week_end})"
+
+    @property
+    def is_current(self):
+        today = timezone.localdate()
+        return self.is_active and self.is_published and self.week_start <= today <= self.week_end
+
+
+class BusinessLunchItem(models.Model):
+    menu = models.ForeignKey(
+        BusinessLunchMenu,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="Меню",
+    )
+
+    name = models.CharField("Название", max_length=160)
+    description = models.TextField("Описание", blank=True)
+
+    price = models.DecimalField("Цена", max_digits=10, decimal_places=2)
+
+    image = models.ImageField("Изображение", upload_to="business_lunches/", blank=True)
+    sort_order = models.PositiveIntegerField("Сортировка", default=100)
+
+    class Meta:
+        verbose_name = "Позиция бизнес-ланча"
+        verbose_name_plural = "Позиции бизнес-ланча"
+        ordering = ["sort_order", "id"]
+
+    def __str__(self):
+        return self.name

@@ -4,6 +4,8 @@ from orders.cart import CART_SESSION_KEY
 from .models import Category, Product
 from promotions.models import PromoBanner
 
+from core.utils import get_current_business_lunch_menu
+
 
 PREVIEW_PRODUCTS_PER_CATEGORY = 4
 
@@ -53,6 +55,8 @@ def catalog_index(request):
     .order_by("sort_order", "-created_at", "id")
     )
 
+    current_business_lunch_menu = get_current_business_lunch_menu()
+
     return render(
         request,
         "catalog/index.html",
@@ -61,6 +65,7 @@ def catalog_index(request):
             "preview_sections": preview_sections,
             "cart_map": _get_cart_map(request),
             "banners": banners,
+            "current_business_lunch_menu": current_business_lunch_menu,
         },
     )
 

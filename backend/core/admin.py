@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CafeSettings, DeliveryZone
+from .models import CafeSettings, DeliveryZone, BusinessLunchMenu, BusinessLunchItem
 
 
 @admin.register(CafeSettings)
@@ -33,3 +33,26 @@ class DeliveryZoneAdmin(admin.ModelAdmin):
     search_fields = ("name", "code")
     ordering = ("sort_order", "name")
     prepopulated_fields = {"code": ("name",)}
+
+
+class BusinessLunchItemInline(admin.TabularInline):
+    model = BusinessLunchItem
+    extra = 1
+    fields = ("name", "description", "price", "image", "sort_order")
+
+
+@admin.register(BusinessLunchMenu)
+class BusinessLunchMenuAdmin(admin.ModelAdmin):
+    list_display = (
+        "title",
+        "week_start",
+        "week_end",
+        "is_active",
+        "is_published",
+        "sort_order",
+    )
+    list_filter = ("is_active", "is_published", "week_start", "week_end")
+    search_fields = ("title", "description")
+    ordering = ("-week_start", "sort_order")
+    prepopulated_fields = {"slug": ("title",)}
+    inlines = [BusinessLunchItemInline]

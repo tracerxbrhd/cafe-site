@@ -236,9 +236,28 @@
   <div class="teaser-grid">
     <article class="teaser-card">
       <div style="font-size:24px;font-weight:800;">Бизнес-ланчи</div>
-      <div class="muted" style="line-height:1.55;">
-        Фиксированные предложения, которые обновляются по неделям. Подходят как для сотрудников компаний, так и для частных клиентов.
-      </div>
+
+      {% if current_business_lunch_menu %}
+        <div class="muted" style="line-height:1.55;">
+          Актуальное меню:
+          <b>{{ current_business_lunch_menu.title }}</b><br>
+          Период: {{ current_business_lunch_menu.week_start }} — {{ current_business_lunch_menu.week_end }}
+        </div>
+
+        <div style="display:grid;gap:6px;font-size:14px;">
+          {% for item in current_business_lunch_menu.items.all|slice:":3" %}
+            <div>• {{ item.name }} — {{ item.price }} ₽</div>
+          {% endfor %}
+          {% if current_business_lunch_menu.items.count > 3 %}
+            <div class="muted">… и другие позиции</div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="muted" style="line-height:1.55;">
+          Фиксированные предложения, которые обновляются по неделям. Подходят как для сотрудников компаний, так и для частных клиентов.
+        </div>
+      {% endif %}
+
       <div style="margin-top:auto;">
         <a href="{% url 'core:business_lunches' %}" class="btn">Подробнее</a>
       </div>
