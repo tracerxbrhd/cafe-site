@@ -4,7 +4,7 @@ from decimal import Decimal
 from typing import Iterable
 from django.utils import timezone
 
-from .models import CafeSettings, DeliveryZone, BusinessLunchMenu, ServicePage
+from .models import CafeSettings, DeliveryZone, ServicePage, BusinessLunchWeek, BusinessLunchDay
 
 
 def get_cafe_settings():
@@ -121,18 +121,53 @@ def get_delivery_quote(lat: float, lon: float, fulfillment: str) -> DeliveryQuot
     )
 
 
-def get_current_business_lunch_menu():
+# def get_current_business_lunch_menu():
+#     today = timezone.localdate()
+
+#     return (
+#         BusinessLunchMenu.objects.filter(
+#             is_active=True,
+#             is_published=True,
+#             week_start__lte=today,
+#             week_end__gte=today,
+#         )
+#         .prefetch_related("items")
+#         .order_by("-week_start", "sort_order", "-id")
+#         .first()
+#     )
+
+
+def get_current_business_lunch_week():
     today = timezone.localdate()
 
     return (
-        BusinessLunchMenu.objects.filter(
+        BusinessLunchWeek.objects.filter(
             is_active=True,
             is_published=True,
             week_start__lte=today,
             week_end__gte=today,
         )
-        .prefetch_related("items")
+        .prefetch_related("days__items__product")
         .order_by("-week_start", "sort_order", "-id")
+        .first()
+    )
+
+
+def get_current_business_lunch_day():
+    today = timezone.localdate()
+
+    return (
+        BusinessLunchDay.objects.filter(
+            week__is_active=True,
+            week__is_published=True,
+            week__week_start__lte=today,
+            week__week_end__gte=today,
+            service_date=today,
+            is_active=True,
+        )
+        .prefetch_related("items__product")
+        .select_related("week")
+        .order_by("sort_order", "id")
         .first()
     )
 

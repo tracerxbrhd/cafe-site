@@ -1,5 +1,12 @@
 from django.contrib import admin
-from .models import CafeSettings, DeliveryZone, BusinessLunchMenu, BusinessLunchItem, ServicePage
+from .models import (
+    CafeSettings,
+    DeliveryZone,
+    ServicePage,
+    BusinessLunchWeek,
+    BusinessLunchDay,
+    BusinessLunchDayItem,
+)
 
 
 @admin.register(CafeSettings)
@@ -35,14 +42,44 @@ class DeliveryZoneAdmin(admin.ModelAdmin):
     prepopulated_fields = {"code": ("name",)}
 
 
-class BusinessLunchItemInline(admin.TabularInline):
-    model = BusinessLunchItem
+# class BusinessLunchItemInline(admin.TabularInline):
+#     model = BusinessLunchItem
+#     extra = 1
+#     fields = ("name", "description", "price", "image", "sort_order")
+
+
+# @admin.register(BusinessLunchMenu)
+# class BusinessLunchMenuAdmin(admin.ModelAdmin):
+#     list_display = (
+#         "title",
+#         "week_start",
+#         "week_end",
+#         "is_active",
+#         "is_published",
+#         "sort_order",
+#     )
+#     list_filter = ("is_active", "is_published", "week_start", "week_end")
+#     search_fields = ("title", "description")
+#     ordering = ("-week_start", "sort_order")
+#     prepopulated_fields = {"slug": ("title",)}
+#     inlines = [BusinessLunchItemInline]
+
+
+class BusinessLunchDayItemInline(admin.TabularInline):
+    model = BusinessLunchDayItem
     extra = 1
-    fields = ("name", "description", "price", "image", "sort_order")
+    fields = ("role", "product", "sort_order")
 
 
-@admin.register(BusinessLunchMenu)
-class BusinessLunchMenuAdmin(admin.ModelAdmin):
+class BusinessLunchDayInline(admin.TabularInline):
+    model = BusinessLunchDay
+    extra = 1
+    fields = ("service_date", "title", "price", "is_active", "sort_order")
+    show_change_link = True
+
+
+@admin.register(BusinessLunchWeek)
+class BusinessLunchWeekAdmin(admin.ModelAdmin):
     list_display = (
         "title",
         "week_start",
@@ -55,7 +92,23 @@ class BusinessLunchMenuAdmin(admin.ModelAdmin):
     search_fields = ("title", "description")
     ordering = ("-week_start", "sort_order")
     prepopulated_fields = {"slug": ("title",)}
-    inlines = [BusinessLunchItemInline]
+    inlines = [BusinessLunchDayInline]
+
+
+@admin.register(BusinessLunchDay)
+class BusinessLunchDayAdmin(admin.ModelAdmin):
+    list_display = (
+        "title",
+        "week",
+        "service_date",
+        "price",
+        "is_active",
+        "sort_order",
+    )
+    list_filter = ("is_active", "service_date", "week")
+    search_fields = ("title", "description", "week__title")
+    ordering = ("service_date", "sort_order")
+    inlines = [BusinessLunchDayItemInline]
 
 
 @admin.register(ServicePage)

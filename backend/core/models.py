@@ -3,6 +3,8 @@ from django.db import models
 from django.utils import timezone
 from datetime import time
 
+from catalog.models import Product
+
 
 class CafeSettings(models.Model):
     is_open = models.BooleanField("Принимаем заказы вручную", default=True)
@@ -130,8 +132,64 @@ class DeliveryZone(models.Model):
         return self.name
     
 
-class BusinessLunchMenu(models.Model):
-    title = models.CharField("Заголовок", max_length=160)
+# class BusinessLunchMenu(models.Model):
+#     title = models.CharField("Заголовок", max_length=160)
+#     slug = models.SlugField("Slug", max_length=180, unique=True)
+
+#     description = models.TextField("Описание", blank=True)
+
+#     week_start = models.DateField("Начало недели")
+#     week_end = models.DateField("Конец недели")
+
+#     is_active = models.BooleanField("Активно", default=True)
+#     is_published = models.BooleanField("Опубликовано", default=True)
+
+#     sort_order = models.PositiveIntegerField("Сортировка", default=100)
+
+#     created_at = models.DateTimeField("Создано", auto_now_add=True)
+#     updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+#     class Meta:
+#         verbose_name = "Меню бизнес-ланчей"
+#         verbose_name_plural = "Меню бизнес-ланчей"
+#         ordering = ["-week_start", "sort_order", "-id"]
+
+#     def __str__(self):
+#         return f"{self.title} ({self.week_start} — {self.week_end})"
+
+#     @property
+#     def is_current(self):
+#         today = timezone.localdate()
+#         return self.is_active and self.is_published and self.week_start <= today <= self.week_end
+
+
+# class BusinessLunchItem(models.Model):
+#     menu = models.ForeignKey(
+#         BusinessLunchMenu,
+#         on_delete=models.CASCADE,
+#         related_name="items",
+#         verbose_name="Меню",
+#     )
+
+#     name = models.CharField("Название", max_length=160)
+#     description = models.TextField("Описание", blank=True)
+
+#     price = models.DecimalField("Цена", max_digits=10, decimal_places=2)
+
+#     image = models.ImageField("Изображение", upload_to="business_lunches/", blank=True)
+#     sort_order = models.PositiveIntegerField("Сортировка", default=100)
+
+#     class Meta:
+#         verbose_name = "Позиция бизнес-ланча"
+#         verbose_name_plural = "Позиции бизнес-ланча"
+#         ordering = ["sort_order", "id"]
+
+#     def __str__(self):
+#         return self.name
+
+
+class BusinessLunchWeek(models.Model):
+    title = models.CharField("Заголовок недели", max_length=160)
     slug = models.SlugField("Slug", max_length=180, unique=True)
 
     description = models.TextField("Описание", blank=True)
@@ -148,42 +206,86 @@ class BusinessLunchMenu(models.Model):
     updated_at = models.DateTimeField("Обновлено", auto_now=True)
 
     class Meta:
-        verbose_name = "Меню бизнес-ланчей"
-        verbose_name_plural = "Меню бизнес-ланчей"
+        verbose_name = "Неделя бизнес-ланчей"
+        verbose_name_plural = "Недели бизнес-ланчей"
         ordering = ["-week_start", "sort_order", "-id"]
 
     def __str__(self):
         return f"{self.title} ({self.week_start} — {self.week_end})"
 
-    @property
-    def is_current(self):
-        today = timezone.localdate()
-        return self.is_active and self.is_published and self.week_start <= today <= self.week_end
 
-
-class BusinessLunchItem(models.Model):
-    menu = models.ForeignKey(
-        BusinessLunchMenu,
+class BusinessLunchDay(models.Model):
+    week = models.ForeignKey(
+        BusinessLunchWeek,
         on_delete=models.CASCADE,
-        related_name="items",
-        verbose_name="Меню",
+        related_name="days",
+        verbose_name="Неделя",
     )
 
-    name = models.CharField("Название", max_length=160)
+    service_date = models.DateField("Дата")
+    title = models.CharField("Название дня", max_length=160)
     description = models.TextField("Описание", blank=True)
 
-    price = models.DecimalField("Цена", max_digits=10, decimal_places=2)
+    price = models.DecimalField("Цена бизнес-ланча", max_digits=10, decimal_places=2)
 
-    image = models.ImageField("Изображение", upload_to="business_lunches/", blank=True)
+    is_active = models.BooleanField("Активно", default=True)
+    sort_order = models.PositiveIntegerField("Сортировка", default=100)
+
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "День бизнес-ланча"
+        verbose_name_plural = "Дни бизнес-ланчей"
+        ordering = ["service_date", "sort_order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["week", "service_date"],
+                name="unique_business_lunch_day_per_week_date",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.service_date})"
+
+    @property
+    def display_name(self):
+        return f"Бизнес-ланч · {self.title}"
+
+
+class BusinessLunchDayItem(models.Model):
+    day = models.ForeignKey(
+        BusinessLunchDay,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="День",
+    )
+
+    role = models.CharField(
+        "Роль / категория",
+        max_length=80,
+        blank=True,
+        help_text='Например: "Салат", "Суп", "Горячее", "Напиток".',
+    )
+
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="business_lunch_day_items",
+        verbose_name="Товар из меню",
+    )
+
     sort_order = models.PositiveIntegerField("Сортировка", default=100)
 
     class Meta:
-        verbose_name = "Позиция бизнес-ланча"
-        verbose_name_plural = "Позиции бизнес-ланча"
+        verbose_name = "Позиция дня бизнес-ланча"
+        verbose_name_plural = "Позиции дней бизнес-ланчей"
         ordering = ["sort_order", "id"]
 
     def __str__(self):
-        return self.name
+        if self.role:
+            return f"{self.role}: {self.product.name}"
+        return self.product.name
     
 
 class ServicePage(models.Model):
