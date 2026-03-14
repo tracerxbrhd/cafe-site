@@ -1,21 +1,15 @@
-# python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# env
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
 .env
 .env.*
 !.env*.example
-
-# django
 media/
 staticfiles/
-
-# vscode / ide
-.vscode/
-.idea/
-
-# misc
-.DS_Store
+*.sqlite3
