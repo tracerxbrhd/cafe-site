@@ -17,6 +17,16 @@ def env_list(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def with_default_hosts(*hosts: str) -> list[str]:
+    seen: set[str] = set()
+    ordered_hosts: list[str] = []
+    for host in hosts:
+        if host and host not in seen:
+            seen.add(host)
+            ordered_hosts.append(host)
+    return ordered_hosts
+
+
 env_file = os.getenv("DJANGO_ENV_FILE", "").strip()
 if env_file:
     env_path = Path(env_file)
@@ -29,7 +39,11 @@ else:
 # Core
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev")
 DEBUG = env_bool("DJANGO_DEBUG", False)
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
+ALLOWED_HOSTS = with_default_hosts(
+    *env_list("DJANGO_ALLOWED_HOSTS"),
+    "127.0.0.1",
+    "localhost",
+)
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 
 INSTALLED_APPS = [
@@ -108,7 +122,7 @@ USE_TZ = True
 # Static / Media
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
