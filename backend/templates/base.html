@@ -851,7 +851,7 @@
     "
   ></div>
 
-<script>
+{% comment %} <script>
 function getCookie(name) {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
@@ -1075,6 +1075,356 @@ document.addEventListener("click", async (e) => {
 
   e.preventDefault();
   await handleCartAction(action, productId);
+});
+</script> {% endcomment %}
+<script>
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+  return null;
+}
+
+async function postForm(url, data) {
+  const form = new URLSearchParams();
+  for (const [k, v] of Object.entries(data)) {
+    form.append(k, String(v));
+  }
+
+  const csrftoken = getCookie("csrftoken");
+
+  const resp = await fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CSRFToken": csrftoken ?? "",
+    },
+    body: form.toString()
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`HTTP ${resp.status}: ${text}`);
+  }
+
+  return await resp.json();
+}
+
+function setCartCount(count) {
+  const el = document.getElementById("cart-count");
+  if (el) el.textContent = String(count);
+}
+
+function keyFor(kind, id) {
+  return kind === "business_lunch" ? `lunch-${id}` : `product-${id}`;
+}
+
+function setItemQty(kind, id, qty) {
+  const key = keyFor(kind, id);
+
+  document.querySelectorAll(`[data-qty="${key}"]`).forEach((el) => {
+    el.textContent = String(qty);
+  });
+
+  document.querySelectorAll(`[data-cart-action="dec"][data-cart-kind="${kind}"]`).forEach((btn) => {
+    const btnId = kind === "business_lunch"
+      ? btn.getAttribute("data-lunch-day-id")
+      : btn.getAttribute("data-product-id");
+
+    if (String(btnId) === String(id)) {
+      btn.disabled = !(qty > 0) || btn.dataset.loading === "1";
+    }
+  });
+}
+
+function setItemLoading(kind, id, isLoading) {
+  document.querySelectorAll(`[data-cart-kind="${kind}"]`).forEach((btn) => {
+    const btnId = kind === "business_lunch"
+      ? btn.getAttribute("data-lunch-day-id")
+      : btn.getAttribute("data-product-id");
+
+    if (String(btnId) !== String(id)) return;
+
+    btn.dataset.loading = isLoading ? "1" : "0";
+
+    if (isLoading) {
+      btn.disabled = true;
+      btn.style.opacity = "0.6";
+      btn.style.cursor = "wait";
+    } else {
+      btn.style.opacity = "";
+      btn.style.cursor = "";
+    }
+  });
+}
+
+function showToast(message, kind = "success") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.textContent = message;
+  toast.style.cssText = `
+    background: ${kind === "error" ? "#b00020" : "#111"};
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity .2s ease, transform .2s ease;
+    pointer-events: none;
+    max-width: 280px;
+  `;
+
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "translateY(0)";
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(8px)";
+    setTimeout(() => toast.remove(), 220);
+  }, 1800);
+}
+
+{% comment %} async function refreshCartPage() {
+  const totalEl = document.getElementById("cart-total");
+  if (!totalEl) return;
+
+  const resp = await fetch("{% url 'orders:api_summary' %}", {
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+  if (!resp.ok) return;
+
+  const data = await resp.json();
+
+  setCartCount(data.count);
+  totalEl.textContent = data.total;
+
+  for (const item of data.items) {
+    if (item.kind === "product") {
+      document.querySelectorAll(`[data-line-total="product-${item.product_id}"]`).forEach((el) => {
+        el.textContent = String(item.line_total);
+      });
+      setItemQty("product", item.product_id, item.qty);
+    }
+
+    if (item.kind === "business_lunch") {
+      document.querySelectorAll(`[data-line-total="lunch-${item.lunch_day_id}"]`).forEach((el) => {
+        el.textContent = String(item.line_total);
+      });
+      setItemQty("business_lunch", item.lunch_day_id, item.qty);
+    }
+  }
+
+  if (data.count === 0) {
+    location.reload();
+  }
+} {% endcomment %}
+async function refreshCartPage() {
+  const totalEl = document.getElementById("cart-total");
+  if (!totalEl) return;
+
+  const resp = await fetch("{% url 'orders:api_summary' %}", {
+    credentials: "same-origin",
+    cache: "no-store"
+  });
+  if (!resp.ok) return;
+
+  const data = await resp.json();
+
+  setCartCount(data.count);
+  totalEl.textContent = data.total;
+
+  const presentKeys = new Set();
+
+  for (const item of data.items) {
+    if (item.kind === "product") {
+      const key = `product-${item.product_id}`;
+      presentKeys.add(key);
+
+      document.querySelectorAll(`[data-qty="${key}"]`).forEach((el) => {
+        el.textContent = String(item.qty);
+      });
+
+      document.querySelectorAll(`[data-line-total="${key}"]`).forEach((el) => {
+        el.textContent = String(item.line_total);
+      });
+
+      document.querySelectorAll(
+        `[data-cart-action="dec"][data-cart-kind="product"][data-product-id="${item.product_id}"]`
+      ).forEach((btn) => {
+        btn.disabled = !(item.qty > 0) || btn.dataset.loading === "1";
+      });
+    }
+
+    if (item.kind === "business_lunch") {
+      const key = `lunch-${item.lunch_day_id}`;
+      presentKeys.add(key);
+
+      document.querySelectorAll(`[data-qty="${key}"]`).forEach((el) => {
+        el.textContent = String(item.qty);
+      });
+
+      document.querySelectorAll(`[data-line-total="${key}"]`).forEach((el) => {
+        el.textContent = String(item.line_total);
+      });
+
+      document.querySelectorAll(
+        `[data-cart-action="dec"][data-cart-kind="business_lunch"][data-lunch-day-id="${item.lunch_day_id}"]`
+      ).forEach((btn) => {
+        btn.disabled = !(item.qty > 0) || btn.dataset.loading === "1";
+      });
+    }
+  }
+
+  document.querySelectorAll("[data-cart-row-key]").forEach((row) => {
+    const key = row.getAttribute("data-cart-row-key");
+    if (!presentKeys.has(key)) {
+      row.remove();
+    }
+  });
+
+  if (data.count === 0) {
+    location.reload();
+  }
+}
+
+const cartLocks = new Map();
+
+async function handleCartAction(action, kind, id) {
+  if (!id) return;
+
+  const lockKey = `${kind}:${id}`;
+  if (cartLocks.get(lockKey)) return;
+
+  cartLocks.set(lockKey, true);
+  setItemLoading(kind, id, true);
+
+  try {
+    let response;
+
+    if (kind === "product") {
+      if (action === "add") {
+        response = await postForm("{% url 'orders:api_add' %}", {
+          product_id: id,
+          qty_delta: 1
+        });
+      } else if (action === "dec") {
+        response = await postForm("{% url 'orders:api_add' %}", {
+          product_id: id,
+          qty_delta: -1
+        });
+      }
+    }
+
+    if (kind === "business_lunch") {
+      if (action === "add") {
+        response = await postForm("{% url 'orders:api_add_business_lunch' %}", {
+          lunch_day_id: id,
+          qty_delta: 1
+        });
+      } else if (action === "dec") {
+        response = await postForm("{% url 'orders:api_add_business_lunch' %}", {
+          lunch_day_id: id,
+          qty_delta: -1
+        });
+      }
+    }
+
+    if (action === "clear") {
+      response = await postForm("{% url 'orders:api_clear' %}", {});
+      setCartCount(response.count);
+      showToast("Корзина очищена");
+      location.reload();
+      return;
+    }
+
+    if (!response) return;
+
+    setCartCount(response.count);
+
+    if (kind === "product" && response.product_id != null && response.qty != null) {
+      setItemQty("product", response.product_id, response.qty);
+    }
+
+    if (kind === "business_lunch" && response.lunch_day_id != null && response.qty != null) {
+      setItemQty("business_lunch", response.lunch_day_id, response.qty);
+    }
+
+    await refreshCartPage();
+
+    if (action === "add") {
+      showToast("Позиция добавлена в корзину");
+    } else if (action === "dec") {
+      showToast("Корзина обновлена");
+    }
+  } catch (err) {
+    console.error(err);
+    showToast("Ошибка обновления корзины", "error");
+    } finally {
+    cartLocks.delete(lockKey);
+    setItemLoading(kind, id, false);
+
+    let qty = 0;
+    const key = kind === "business_lunch" ? `lunch-${id}` : `product-${id}`;
+    const qtyEls = document.querySelectorAll(`[data-qty="${key}"]`);
+    if (qtyEls.length) {
+      qty = Number(qtyEls[0].textContent || "0");
+    }
+
+    document.querySelectorAll(
+      `[data-cart-action="add"][data-cart-kind="${kind}"]`
+    ).forEach((btn) => {
+      const btnId = kind === "business_lunch"
+        ? btn.getAttribute("data-lunch-day-id")
+        : btn.getAttribute("data-product-id");
+
+      if (String(btnId) === String(id)) {
+        btn.disabled = false;
+      }
+    });
+
+    document.querySelectorAll(
+      `[data-cart-action="dec"][data-cart-kind="${kind}"]`
+    ).forEach((btn) => {
+      const btnId = kind === "business_lunch"
+        ? btn.getAttribute("data-lunch-day-id")
+        : btn.getAttribute("data-product-id");
+
+      if (String(btnId) === String(id)) {
+        btn.disabled = !(qty > 0);
+      }
+    });
+  }
+}
+
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-cart-action]");
+  if (!btn) return;
+
+  const action = btn.getAttribute("data-cart-action");
+
+  if (action === "clear") {
+    e.preventDefault();
+    await handleCartAction(action, "clear", "__clear__");
+    return;
+  }
+
+  const kind = btn.getAttribute("data-cart-kind") || "product";
+  const id = kind === "business_lunch"
+    ? btn.getAttribute("data-lunch-day-id")
+    : btn.getAttribute("data-product-id");
+
+  e.preventDefault();
+  await handleCartAction(action, kind, id);
 });
 </script>
 </body>

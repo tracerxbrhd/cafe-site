@@ -6,62 +6,137 @@
 
   {% if not lines %}
     <div class="card empty-state">
-      <div style="font-size:22px;font-weight:700;margin-bottom:8px;">Корзина пуста</div>
-      <div class="muted" style="margin-bottom:16px;">
-        Добавь блюда из каталога, и они появятся здесь.
+      <div style="font-size:24px;font-weight:800;margin-bottom:10px;">Корзина пуста</div>
+      <div class="muted" style="margin-bottom:18px;line-height:1.6;">
+        Добавь блюда из меню или выбери актуальный бизнес-ланч.
       </div>
-      <a href="{% url 'catalog:index' %}" class="btn-link">Перейти в каталог</a>
+      <a href="{% url 'catalog:index' %}" class="btn btn-primary">Перейти в меню</a>
     </div>
   {% else %}
     <div class="cart-layout">
       <div class="cart-items">
         {% for line in lines %}
-          <div
-            class="card cart-row"
-            data-cart-row
-          >
-            <div class="cart-row-left">
-              {% if line.product.main_image %}
-                <img
-                  src="{{ line.product.main_image.image.url }}"
-                  alt="{{ line.product.name }}"
-                  class="cart-row-image"
-                />
-              {% else %}
-                <div class="cart-row-image" style="display:flex;align-items:center;justify-content:center;opacity:.55;">
-                  Нет фото
-                </div>
-              {% endif %}
+          {% if line.kind == "product" and line.product %}
+            <div class="card cart-row" data-cart-row data-cart-row-key="product-{{ line.product.id }}">
+              <div class="cart-row-left">
+                {% if line.product.main_image %}
+                  <img
+                    src="{{ line.product.main_image.image.url }}"
+                    alt="{{ line.product.name }}"
+                    class="cart-row-image"
+                  />
+                {% else %}
+                  <div class="cart-row-image" style="display:flex;align-items:center;justify-content:center;opacity:.55;">
+                    Нет фото
+                  </div>
+                {% endif %}
 
-              <div>
-                <div style="font-size:18px;font-weight:700;margin-bottom:4px;">{{ line.product.name }}</div>
-                <div class="muted" style="font-size:13px;">{{ line.product.category.name }}</div>
+                <div>
+                  <div style="font-size:18px;font-weight:700;margin-bottom:4px;">
+                    {{ line.product.name }}
+                  </div>
 
-                <div style="margin-top:8px;">
-                  {{ line.product.price }} ₽ ×
-                  <span data-qty="{{ line.product.id }}">{{ line.qty }}</span>
-                  =
-                  <span data-line-total="{{ line.product.id }}">{{ line.line_total }}</span> ₽
+                  <div class="muted" style="font-size:13px;">
+                    {{ line.product.category.name }}
+                  </div>
+
+                  {% if line.product.description %}
+                    <div class="muted" style="margin-top:6px;font-size:13px;line-height:1.45;max-width:520px;">
+                      {{ line.product.description|truncatechars:120 }}
+                    </div>
+                  {% endif %}
+
+                  <div style="margin-top:10px;">
+                    {{ line.unit_price }} ₽ ×
+                    <span data-qty="product-{{ line.product.id }}">{{ line.qty }}</span>
+                    =
+                    <span data-line-total="product-{{ line.product.id }}">{{ line.line_total }}</span> ₽
+                  </div>
                 </div>
+              </div>
+
+              <div class="qty-controls">
+                <button
+                  type="button"
+                  data-cart-action="dec"
+                  data-cart-kind="product"
+                  data-product-id="{{ line.product.id }}"
+                  class="btn-icon"
+                  {% if line.qty <= 0 %}disabled{% endif %}
+                >−</button>
+
+                <button
+                  type="button"
+                  data-cart-action="add"
+                  data-cart-kind="product"
+                  data-product-id="{{ line.product.id }}"
+                  class="btn-icon"
+                >+</button>
               </div>
             </div>
 
-            <div class="qty-controls">
-              <button
-                type="button"
-                data-cart-action="dec"
-                data-product-id="{{ line.product.id }}"
-                class="btn-icon"
-              >−</button>
+          {% elif line.kind == "business_lunch" and line.lunch_day %}
+            <div class="card cart-row" data-cart-row data-cart-row-key="lunch-{{ line.lunch_day.id }}">
+              <div class="cart-row-left">
+                <div
+                  class="cart-row-image"
+                  style="display:flex;align-items:center;justify-content:center;background:#f6f6f6;font-weight:800;"
+                >
+                  Ланч
+                </div>
 
-              <button
-                type="button"
-                data-cart-action="add"
-                data-product-id="{{ line.product.id }}"
-                class="btn-icon"
-              >+</button>
+                <div>
+                  <div style="font-size:18px;font-weight:700;margin-bottom:4px;">
+                    {{ line.lunch_day.display_name }}
+                  </div>
+
+                  <div class="muted" style="font-size:13px;">
+                    {{ line.lunch_day.service_date }} · {{ line.lunch_day.week.title }}
+                  </div>
+
+                  {% if line.lunch_day.description %}
+                    <div class="muted" style="margin-top:6px;font-size:13px;line-height:1.45;max-width:520px;">
+                      {{ line.lunch_day.description|truncatechars:140 }}
+                    </div>
+                  {% endif %}
+
+                  <div style="margin-top:10px;">
+                    {{ line.unit_price }} ₽ ×
+                    <span data-qty="lunch-{{ line.lunch_day.id }}">{{ line.qty }}</span>
+                    =
+                    <span data-line-total="lunch-{{ line.lunch_day.id }}">{{ line.line_total }}</span> ₽
+                  </div>
+
+                  <div style="margin-top:10px;display:grid;gap:4px;font-size:13px;line-height:1.45;">
+                    {% for item in line.lunch_day.items.all %}
+                      <div>
+                        • {% if item.role %}<b>{{ item.role }}:</b> {% endif %}{{ item.product.name }}
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+
+              <div class="qty-controls">
+                <button
+                  type="button"
+                  data-cart-action="dec"
+                  data-cart-kind="business_lunch"
+                  data-lunch-day-id="{{ line.lunch_day.id }}"
+                  class="btn-icon"
+                  {% if line.qty <= 0 %}disabled{% endif %}
+                >−</button>
+
+                <button
+                  type="button"
+                  data-cart-action="add"
+                  data-cart-kind="business_lunch"
+                  data-lunch-day-id="{{ line.lunch_day.id }}"
+                  class="btn-icon"
+                >+</button>
+              </div>
             </div>
-          </div>
+          {% endif %}
         {% endfor %}
       </div>
 
@@ -70,14 +145,22 @@
 
         <div class="cart-summary-total">
           <div class="muted">Итого</div>
-          <div style="font-size:24px;font-weight:700;">
+          <div style="font-size:24px;font-weight:800;">
             <span id="cart-total">{{ total }}</span> ₽
           </div>
         </div>
 
         <div style="display:grid;gap:10px;">
           <a href="{% url 'orders:checkout' %}" class="btn btn-primary">Оформить заказ</a>
-          <button type="button" data-cart-action="clear" class="btn">Очистить корзину</button>
+
+          <button
+            type="button"
+            data-cart-action="clear"
+            class="btn"
+          >
+            Очистить корзину
+          </button>
+
           <a href="{% url 'catalog:index' %}" class="btn-link">Продолжить выбор</a>
         </div>
       </aside>

@@ -1,22 +1,56 @@
+# from django.http import JsonResponse
+# from django.views.decorators.http import require_POST, require_http_methods
+
+# import logging
+# from decimal import Decimal
+# from django.shortcuts import get_object_or_404, redirect, render
+# from core.models import BusinessLunchDay
+# from catalog.models import Product
+# from .forms import CheckoutForm
+# from .models import Order, OrderItem
+
+# from integrations.telegram.client import send_message, TelegramError
+# from .notifications import format_new_order_message, build_order_status_keyboard
+
+# from core.utils import get_cafe_settings, get_delivery_quote
+# from django.contrib import messages
+
+# from .cart import _get_cart_dict, cart_get_qty  # добавь импорт (или сделай отдельную функцию cart_get_qty)
+
+# from .cart import (
+#     add_business_lunch,
+#     cart_add,
+#     cart_clear,
+#     cart_count,
+#     cart_lines,
+#     cart_set,
+# )
+from decimal import Decimal
+import logging
+
+from django.contrib import messages
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST, require_http_methods
 
-import logging
-from decimal import Decimal
-from django.shortcuts import get_object_or_404, redirect, render
-from catalog.models import Product
+from core.models import BusinessLunchDay
+from core.utils import get_cafe_settings, get_delivery_quote
+from integrations.telegram.client import TelegramError, send_message
+
+from .cart import (
+    CART_SESSION_KEY,
+    add_business_lunch,
+    cart_add,
+    cart_clear,
+    cart_count,
+    cart_get_qty,
+    cart_lines,
+    cart_set,
+    lunch_get_qty,
+)
 from .forms import CheckoutForm
 from .models import Order, OrderItem
-
-from integrations.telegram.client import send_message, TelegramError
-from .notifications import format_new_order_message, build_order_status_keyboard
-
-from core.utils import get_cafe_settings, get_delivery_quote
-from django.contrib import messages
-
-from .cart import _get_cart_dict, cart_get_qty  # добавь импорт (или сделай отдельную функцию cart_get_qty)
-
-from .cart import cart_add, cart_clear, cart_count, cart_lines, cart_set
+from .notifications import build_order_status_keyboard, format_new_order_message
 
 
 
@@ -26,20 +60,51 @@ def cart_page(request):
     return render(request, "orders/cart.html", {"lines": lines, "total": total})
 
 
+# def cart_api_summary(request):
+#     lines, total = cart_lines(request.session)
+#     return JsonResponse(
+#         {
+#             "count": cart_count(request.session),
+#             "total": str(total),
+#             "items": [
+#                 {
+#                     "product_id": line.product.id,
+#                     "qty": line.qty,
+#                     "line_total": str(line.line_total),
+#                 }
+#                 for line in lines
+#             ],
+#         }
+#     )
 def cart_api_summary(request):
     lines, total = cart_lines(request.session)
-    return JsonResponse(
-        {
-            "count": cart_count(request.session),
-            "total": str(total),
-            "items": [
+
+    items = []
+    for line in lines:
+        if line.kind == "product" and line.product:
+            items.append(
                 {
+                    "kind": "product",
                     "product_id": line.product.id,
                     "qty": line.qty,
                     "line_total": str(line.line_total),
                 }
-                for line in lines
-            ],
+            )
+        elif line.kind == "business_lunch" and line.lunch_day:
+            items.append(
+                {
+                    "kind": "business_lunch",
+                    "lunch_day_id": line.lunch_day.id,
+                    "qty": line.qty,
+                    "line_total": str(line.line_total),
+                }
+            )
+
+    return JsonResponse(
+        {
+            "count": cart_count(request.session),
+            "total": str(total),
+            "items": items,
         }
     )
 
@@ -423,15 +488,45 @@ def checkout_page(request):
 
             order_total = Decimal("0.00")
 
+            # for line in lines:
+            #     item = OrderItem.objects.create(
+            #         order=order,
+            #         product=line.product,
+            #         product_name=line.product.name,
+            #         unit_price=line.product.price,
+            #         quantity=line.qty,
+            #         line_total=line.line_total,
+            #     )
+            #     order_total += item.line_total
             for line in lines:
-                item = OrderItem.objects.create(
-                    order=order,
-                    product=line.product,
-                    product_name=line.product.name,
-                    unit_price=line.product.price,
-                    quantity=line.qty,
-                    line_total=line.line_total,
-                )
+                if line.kind == "product" and line.product:
+                    item = OrderItem.objects.create(
+                        order=order,
+                        product=line.product,
+                        product_name=line.product.name,
+                        unit_price=line.unit_price,
+                        quantity=line.qty,
+                        line_total=line.line_total,
+                    )
+                elif line.kind == "business_lunch" and line.lunch_day:
+                    composition_parts = []
+                    for comp in line.lunch_day.items.all():
+                        if comp.role:
+                            composition_parts.append(f"{comp.role}: {comp.product.name}")
+                        else:
+                            composition_parts.append(comp.product.name)
+
+                    item = OrderItem.objects.create(
+                        order=order,
+                        product=None,
+                        product_name=line.lunch_day.display_name,
+                        unit_price=line.unit_price,
+                        quantity=line.qty,
+                        line_total=line.line_total,
+                    )
+                else:
+                    continue
+
                 order_total += item.line_total
 
             order_total += delivery_fee
@@ -545,5 +640,31 @@ def delivery_api_quote(request):
             "delivery_fee": str(quote.delivery_fee),
             "min_order_amount": str(quote.min_order_amount),
             "reason": quote.reason,
+        }
+    )
+
+
+
+@require_POST
+def cart_api_add_business_lunch(request):
+    try:
+        lunch_day_id = int(request.POST.get("lunch_day_id", "0"))
+        qty_delta = int(request.POST.get("qty_delta", "1"))
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Некорректные параметры"}, status=400)
+
+    lunch_day = BusinessLunchDay.objects.filter(id=lunch_day_id, is_active=True).first()
+    if not lunch_day:
+        return JsonResponse({"ok": False, "error": "Бизнес-ланч не найден"}, status=404)
+
+    qty = add_business_lunch(request.session, lunch_day_id=lunch_day_id, qty_delta=qty_delta)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "kind": "business_lunch",
+            "lunch_day_id": lunch_day.id,
+            "qty": qty,
+            "count": cart_count(request.session),
         }
     )

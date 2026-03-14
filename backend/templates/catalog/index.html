@@ -385,18 +385,20 @@
                         <button
                           type="button"
                           data-cart-action="dec"
+                          data-cart-kind="product"
                           data-product-id="{{ p.id }}"
                           {% if not q %}disabled{% endif %}
                           class="btn-icon"
                         >−</button>
 
-                        <span data-qty="{{ p.id }}" class="qty-value">
+                        <span data-qty="product-{{ p.id }}" class="qty-value">
                           {{ q|default:0 }}
                         </span>
 
                         <button
                           type="button"
                           data-cart-action="add"
+                          data-cart-kind="product"
                           data-product-id="{{ p.id }}"
                           class="btn-icon"
                         >+</button>
