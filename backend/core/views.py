@@ -1,4 +1,7 @@
+from django.conf import settings
+from django.http import HttpResponse
 from django.shortcuts import render
+from django.urls import reverse
 from .models import BusinessLunchWeek, BusinessLunchDay, ServicePage
 from .utils import get_current_business_lunch_day, get_service_page
 from orders.cart import lunch_get_qty
@@ -41,3 +44,18 @@ def banquets_page(request):
 def catering_page(request):
     page = get_service_page(ServicePage.PageType.CATERING)
     return render(request, "core/service_page.html", {"page": page, "page_kind": "catering"})
+
+
+def robots_txt(request):
+    origin = settings.SITE_URL.rstrip("/") if settings.SITE_URL else request.build_absolute_uri("/").rstrip("/")
+    sitemap_url = f"{origin}{reverse('sitemap')}"
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin/",
+        "Disallow: /telegram/",
+        "Disallow: /cart/api/",
+        "Disallow: /healthz/",
+        f"Sitemap: {sitemap_url}",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain; charset=utf-8")

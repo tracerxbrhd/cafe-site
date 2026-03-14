@@ -4,6 +4,62 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Сказка{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{{ seo_default_description }}{% endblock %}" />
+  <meta name="robots" content="{% block meta_robots %}index,follow{% endblock %}" />
+  <link rel="canonical" href="{% block canonical_url %}{{ seo_canonical_url }}{% endblock %}" />
+  <meta property="og:locale" content="ru_RU" />
+  <meta property="og:site_name" content="{{ site_name }}" />
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}" />
+  <meta property="og:title" content="{% block og_title %}{{ site_name }}{% endblock %}" />
+  <meta property="og:description" content="{% block og_description %}{{ seo_default_description }}{% endblock %}" />
+  <meta property="og:url" content="{% block og_url %}{{ seo_canonical_url }}{% endblock %}" />
+  {% if seo_default_image_url %}
+    <meta property="og:image" content="{{ seo_default_image_url }}" />
+  {% endif %}
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{% block twitter_title %}{{ site_name }}{% endblock %}" />
+  <meta name="twitter:description" content="{% block twitter_description %}{{ seo_default_description }}{% endblock %}" />
+  {% if seo_default_image_url %}
+    <meta name="twitter:image" content="{{ seo_default_image_url }}" />
+  {% endif %}
+  {% if google_site_verification %}
+    <meta name="google-site-verification" content="{{ google_site_verification }}" />
+  {% endif %}
+  {% if yandex_verification %}
+    <meta name="yandex-verification" content="{{ yandex_verification }}" />
+  {% endif %}
+  {% if seo_restaurant_schema %}
+    <script type="application/ld+json">{{ seo_restaurant_schema|safe }}</script>
+  {% endif %}
+  {% block structured_data %}{% endblock %}
+  {% if google_tag_id %}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_tag_id }}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag("js", new Date());
+      gtag("config", "{{ google_tag_id }}");
+    </script>
+  {% endif %}
+  {% if yandex_metrika_counter_id %}
+    <script type="text/javascript">
+      (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {
+          if (document.scripts[j].src === r) { return; }
+        }
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a);
+      })(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+      ym({{ yandex_metrika_counter_id }}, "init", {
+        clickmap: true,
+        trackLinks: true,
+        accurateTrackBounce: true,
+        webvisor: true
+      });
+    </script>
+  {% endif %}
 
   <style>
     :root {
@@ -186,6 +242,37 @@
     .site-nav a:hover {
       color: #000;
       background: rgba(17, 17, 17, 0.05);
+    }
+
+    .mobile-menu-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--text);
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: var(--shadow-xs);
+      transition:
+        background .22s var(--ease-soft),
+        border-color .22s var(--ease-soft),
+        transform .18s var(--ease-soft),
+        box-shadow .22s var(--ease-soft);
+    }
+
+    .mobile-menu-toggle:hover {
+      background: #fff;
+      border-color: var(--border-strong);
+      box-shadow: var(--shadow-sm);
+      transform: translateY(-1px);
+    }
+
+    .header-label-short {
+      display: none;
     }
 
     .header-actions {
@@ -1107,12 +1194,83 @@
     }
 
     @media (max-width: 768px) {
+      .site-topbar {
+        display: none;
+      }
+
       .container {
         padding: 0 14px;
       }
 
       .page-section {
         padding: 28px 0 34px;
+      }
+
+      .site-header-inner {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 10px 8px;
+        min-height: 64px;
+        padding: 10px 0;
+      }
+
+      .site-brand {
+        min-width: 0;
+        gap: 2px;
+      }
+
+      .site-brand-title {
+        font-size: 22px;
+      }
+
+      .site-brand-subtitle {
+        display: none;
+      }
+
+      .mobile-menu-toggle {
+        display: inline-flex;
+      }
+
+      .header-actions {
+        width: auto;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .header-action-link {
+        min-height: 40px;
+        padding: 0 12px;
+        font-size: 13px;
+      }
+
+      .header-label-full {
+        display: none;
+      }
+
+      .header-label-short {
+        display: inline;
+      }
+
+      .site-nav {
+        display: none;
+        order: initial;
+        grid-column: 1 / -1;
+        width: 100%;
+        flex-wrap: wrap;
+        overflow: visible;
+        padding: 4px 0 0;
+        gap: 8px;
+      }
+
+      .site-header.is-mobile-nav-open .site-nav {
+        display: flex;
+      }
+
+      .site-nav a {
+        padding: 8px 12px;
+        font-size: 14px;
       }
 
       .product-card-desc {
@@ -1138,12 +1296,22 @@
       }
 
       .site-brand-title {
-        font-size: 24px;
+        font-size: 20px;
       }
 
       .header-actions {
-        grid-template-columns: 1fr;
-        display: grid;
+        gap: 6px;
+      }
+
+      .mobile-menu-toggle,
+      .header-action-link {
+        min-height: 38px;
+        padding: 0 10px;
+        font-size: 12px;
+      }
+
+      .header-cart-total {
+        margin-left: 2px;
       }
 
       .cart-row {
@@ -1197,6 +1365,13 @@
   {% block extrahead %}{% endblock %}
 </head>
 <body>
+  {% if yandex_metrika_counter_id %}
+    <noscript>
+      <div>
+        <img src="https://mc.yandex.ru/watch/{{ yandex_metrika_counter_id }}" style="position:absolute; left:-9999px;" alt="" />
+      </div>
+    </noscript>
+  {% endif %}
   <form style="display:none">{% csrf_token %}</form>
 
   <div class="site-topbar">
@@ -1215,7 +1390,7 @@
     </div>
   </div>
 
-  <header class="site-header">
+  <header class="site-header" id="site-header">
     <div class="container">
       <div class="site-header-inner">
         <a href="{% url 'catalog:index' %}" class="site-brand">
@@ -1223,7 +1398,15 @@
           <span class="site-brand-subtitle">Кафе · доставка · самовывоз</span>
         </a>
 
-        <nav class="site-nav">
+        <button
+          type="button"
+          class="mobile-menu-toggle"
+          id="mobile-menu-toggle"
+          aria-expanded="false"
+          aria-controls="site-nav"
+        >Меню</button>
+
+        <nav class="site-nav" id="site-nav">
           <a href="{% url 'catalog:index' %}">Меню</a>
           <a href="{% url 'core:business_lunches' %}">Бизнес-ланчи</a>
           <a href="{% url 'core:banquets' %}">Банкеты</a>
@@ -1231,9 +1414,14 @@
         </nav>
 
         <div class="header-actions">
-          <a href="{% url 'orders:order_lookup' %}" class="header-action-link">Мои заказы</a>
+          <a href="{% url 'orders:order_lookup' %}" class="header-action-link">
+            <span class="header-label-full">Мои заказы</span>
+            <span class="header-label-short">Заказы</span>
+          </a>
           <a href="{% url 'orders:cart' %}" class="header-action-link">
-            Корзина: <span id="cart-header-total" class="header-cart-total">{{ cart_total }}</span> ₽
+            <span class="header-label-full">Корзина:</span>
+            <span class="header-label-short">Корзина</span>
+            <span id="cart-header-total" class="header-cart-total">{{ cart_total }}</span> ₽
           </a>
         </div>
       </div>
@@ -1921,6 +2109,33 @@ document.addEventListener("click", async (e) => {
   e.preventDefault();
   await handleCartAction(action, kind, id);
 });
+
+(function() {
+  const header = document.getElementById("site-header");
+  const toggle = document.getElementById("mobile-menu-toggle");
+  const nav = document.getElementById("site-nav");
+  if (!header || !toggle || !nav) return;
+
+  function closeMobileMenu() {
+    header.classList.remove("is-mobile-nav-open");
+    toggle.setAttribute("aria-expanded", "false");
+  }
+
+  toggle.addEventListener("click", function() {
+    const isOpen = header.classList.toggle("is-mobile-nav-open");
+    toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  });
+
+  nav.querySelectorAll("a").forEach(function(link) {
+    link.addEventListener("click", closeMobileMenu);
+  });
+
+  window.addEventListener("resize", function() {
+    if (window.innerWidth > 768) {
+      closeMobileMenu();
+    }
+  });
+})();
 </script>
 </body>
 </html>

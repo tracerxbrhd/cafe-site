@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Статус заказа #{{ order.id }} — Сказка{% endblock %}
+{% block meta_robots %}noindex,nofollow,noarchive{% endblock %}
 
 {% block content %}
 <h1 class="section-title">Заказ #{{ order.id }}</h1>

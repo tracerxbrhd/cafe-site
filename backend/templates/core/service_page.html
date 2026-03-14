@@ -1,7 +1,40 @@
 {% extends "base.html" %}
 
 {% block title %}
-  {% if page %}{{ page.title }} — Сказка{% else %}Услуги — Сказка{% endif %}
+  {% if page %}{{ page.title }} — кафе «Сказка»{% else %}Услуги — кафе «Сказка»{% endif %}
+{% endblock %}
+{% block meta_description %}
+  {% if page and page.subtitle %}
+    {{ page.subtitle|striptags|truncatechars:160 }}
+  {% elif page and page.content %}
+    {{ page.content|striptags|truncatechars:160 }}
+  {% else %}
+    Услуги кафе «Сказка» в Ижевске: банкеты, кейтеринг и организация питания.
+  {% endif %}
+{% endblock %}
+{% block og_title %}
+  {% if page %}{{ page.title }} — кафе «Сказка»{% else %}Услуги — кафе «Сказка»{% endif %}
+{% endblock %}
+{% block og_description %}
+  {% if page and page.subtitle %}
+    {{ page.subtitle|striptags|truncatechars:160 }}
+  {% elif page and page.content %}
+    {{ page.content|striptags|truncatechars:160 }}
+  {% else %}
+    Услуги кафе «Сказка» в Ижевске: банкеты, кейтеринг и организация питания.
+  {% endif %}
+{% endblock %}
+{% block twitter_title %}
+  {% if page %}{{ page.title }} — кафе «Сказка»{% else %}Услуги — кафе «Сказка»{% endif %}
+{% endblock %}
+{% block twitter_description %}
+  {% if page and page.subtitle %}
+    {{ page.subtitle|striptags|truncatechars:160 }}
+  {% elif page and page.content %}
+    {{ page.content|striptags|truncatechars:160 }}
+  {% else %}
+    Услуги кафе «Сказка» в Ижевске: банкеты, кейтеринг и организация питания.
+  {% endif %}
 {% endblock %}
 
 {% block content %}

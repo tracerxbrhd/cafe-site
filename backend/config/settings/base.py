@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "django.contrib.sitemaps",
     "django.contrib.staticfiles",
     # local apps:
     "core",
@@ -84,6 +85,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 # local templates
                 "orders.context_processors.cart_info",
+                "core.context_processors.site_meta",
                 "core.context_processors.cafe_settings",
             ],
         },
@@ -128,6 +130,21 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+SITE_NAME = os.getenv("SITE_NAME", "Кафе Сказка").strip() or "Кафе Сказка"
+SITE_URL = os.getenv("SITE_URL", "").strip().rstrip("/")
+SEO_DEFAULT_DESCRIPTION = (
+    os.getenv(
+        "SEO_DEFAULT_DESCRIPTION",
+        "Кафе Сказка в Ижевске: доставка еды, бизнес-ланчи, банкеты и кейтеринг.",
+    ).strip()
+    or "Кафе Сказка в Ижевске: доставка еды, бизнес-ланчи, банкеты и кейтеринг."
+)
+SEO_DEFAULT_OG_IMAGE = os.getenv("SEO_DEFAULT_OG_IMAGE", "").strip()
+GOOGLE_TAG_ID = os.getenv("GOOGLE_TAG_ID", "").strip()
+YANDEX_METRIKA_COUNTER_ID = os.getenv("YANDEX_METRIKA_COUNTER_ID", "").strip()
+GOOGLE_SITE_VERIFICATION = os.getenv("GOOGLE_SITE_VERIFICATION", "").strip()
+YANDEX_VERIFICATION = os.getenv("YANDEX_VERIFICATION", "").strip()
 
 YOOKASSA_SHOP_ID = os.getenv("YOOKASSA_SHOP_ID", "").strip()
 YOOKASSA_SECRET_KEY = os.getenv("YOOKASSA_SECRET_KEY", "").strip()

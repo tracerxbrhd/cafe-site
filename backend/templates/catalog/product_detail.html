@@ -1,5 +1,30 @@
 {% extends "base.html" %}
-{% block title %}{{ product.name }} — Сказка{% endblock %}
+{% block title %}{{ product.name }} — заказать в кафе «Сказка»{% endblock %}
+{% block meta_description %}{% if product.description %}{{ product.description|striptags|truncatechars:160 }}{% else %}{{ product.name }} в кафе «Сказка». Оформите заказ с доставкой в Ижевске.{% endif %}{% endblock %}
+{% block og_type %}product{% endblock %}
+{% block og_title %}{{ product.name }} — кафе «Сказка»{% endblock %}
+{% block og_description %}{% if product.description %}{{ product.description|striptags|truncatechars:160 }}{% else %}{{ product.name }} в кафе «Сказка». Оформите заказ с доставкой в Ижевске.{% endif %}{% endblock %}
+{% block twitter_title %}{{ product.name }} — кафе «Сказка»{% endblock %}
+{% block twitter_description %}{% if product.description %}{{ product.description|striptags|truncatechars:160 }}{% else %}{{ product.name }} в кафе «Сказка». Оформите заказ с доставкой в Ижевске.{% endif %}{% endblock %}
+{% block structured_data %}
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "{{ product.name|escapejs }}",
+      "category": "{{ product.category.name|escapejs }}",
+      "description": "{% if product.description %}{{ product.description|striptags|truncatechars:200|escapejs }}{% else %}{{ product.name|escapejs }}{% endif %}",
+      {% if product.main_image %}"image": ["{{ seo_origin }}{{ product.main_image.image.url|escapejs }}"],{% endif %}
+      "offers": {
+        "@type": "Offer",
+        "priceCurrency": "RUB",
+        "price": "{{ product.price }}",
+        "availability": "https://schema.org/InStock",
+        "url": "{{ seo_canonical_url|escapejs }}"
+      }
+    }
+  </script>
+{% endblock %}
 
 {% block content %}
   <div style="margin-bottom:16px;">

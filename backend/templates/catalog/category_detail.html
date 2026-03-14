@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% load dicts %}
-{% block title %}{{ category.name }} — Сказка{% endblock %}
+{% block title %}{{ category.name }} — доставка из кафе «Сказка» в Ижевске{% endblock %}
+{% block meta_description %}Раздел «{{ category.name }}» в меню кафе «Сказка». Заказывайте доставку блюд в Ижевске онлайн.{% endblock %}
+{% block og_title %}{{ category.name }} — кафе «Сказка»{% endblock %}
+{% block og_description %}Смотрите блюда из категории «{{ category.name }}» и оформляйте доставку из кафе «Сказка» в Ижевске.{% endblock %}
+{% block twitter_title %}{{ category.name }} — кафе «Сказка»{% endblock %}
+{% block twitter_description %}Смотрите блюда из категории «{{ category.name }}» и оформляйте доставку из кафе «Сказка» в Ижевске.{% endblock %}
 
 {% block content %}
   <div style="margin-bottom:16px;">
