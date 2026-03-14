@@ -155,3 +155,111 @@ class OrderItem(models.Model):
     def save(self, *args, **kwargs):
         self.line_total = self.unit_price * self.quantity
         super().save(*args, **kwargs)
+
+
+class OnlinePaymentAttempt(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Ожидает оплаты"
+        SUCCEEDED = "succeeded", "Оплачен"
+        CANCELED = "canceled", "Отменён"
+        FAILED = "failed", "Ошибка"
+
+    public_id = models.UUIDField(
+        "Публичный идентификатор платежа",
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+    )
+    order = models.OneToOneField(
+        Order,
+        on_delete=models.SET_NULL,
+        related_name="online_payment_attempt",
+        verbose_name="Созданный заказ",
+        null=True,
+        blank=True,
+    )
+    status = models.CharField(
+        "Статус",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    payment_id = models.CharField(
+        "ID платежа в ЮKassa",
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+    idempotence_key = models.UUIDField(
+        "Idempotence Key",
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+    )
+    provider_status = models.CharField("Статус ЮKassa", max_length=32, blank=True)
+    confirmation_url = models.URLField("Ссылка на оплату", blank=True)
+    provider_payload = models.JSONField("Ответ ЮKassa", default=dict, blank=True)
+    error_message = models.TextField("Текст ошибки", blank=True)
+
+    fulfillment = models.CharField(
+        "Способ получения",
+        max_length=20,
+        choices=Order.Fulfillment.choices,
+        default=Order.Fulfillment.DELIVERY,
+    )
+    payment_method = models.CharField(
+        "Способ оплаты",
+        max_length=24,
+        choices=Order.PaymentMethod.choices,
+        default=Order.PaymentMethod.ONLINE,
+    )
+    customer_name = models.CharField("Имя", max_length=120)
+    customer_phone = models.CharField("Телефон", max_length=32)
+    customer_comment = models.TextField("Комментарий клиента", blank=True)
+
+    address_line = models.CharField("Адрес строкой", max_length=255, blank=True)
+    address_entrance = models.CharField("Подъезд", max_length=20, blank=True)
+    address_floor = models.CharField("Этаж", max_length=20, blank=True)
+    address_apartment = models.CharField("Квартира/офис", max_length=20, blank=True)
+
+    delivery_lat = models.DecimalField(
+        "Широта доставки",
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    delivery_lon = models.DecimalField(
+        "Долгота доставки",
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    delivery_zone_code = models.CharField("Код зоны доставки", max_length=64, blank=True)
+    delivery_zone_name = models.CharField("Название зоны доставки", max_length=120, blank=True)
+
+    items_total = models.DecimalField("Сумма товаров", max_digits=10, decimal_places=2, default=0)
+    delivery_fee = models.DecimalField("Стоимость доставки", max_digits=10, decimal_places=2, default=0)
+    promo_code = models.CharField("Промокод", max_length=32, blank=True)
+    promo_discount_amount = models.DecimalField(
+        "Сумма скидки по промокоду",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+    total = models.DecimalField("Итого к оплате", max_digits=10, decimal_places=2, default=0)
+    cart_snapshot = models.JSONField("Снимок корзины", default=list, blank=True)
+
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Онлайн-оплата"
+        verbose_name_plural = "Онлайн-оплаты"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        base = self.payment_id or self.public_id
+        return f"Online payment {base}"

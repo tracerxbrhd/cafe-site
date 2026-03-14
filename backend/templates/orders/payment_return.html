@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Подтверждение оплаты — Сказка{% endblock %}
+
+{% block content %}
+<div class="panel" style="max-width:760px;" id="payment-return-box">
+  <h1 class="section-title" style="margin-bottom:12px;">Проверяем оплату</h1>
+
+  <p style="margin-top:0;" id="payment-status-text">
+    {% if attempt.status == "pending" %}
+      Возвращение из ЮKassa прошло успешно. Проверяем, подтвердился ли платёж.
+    {% elif attempt.status == "canceled" %}
+      Платёж был отменён. Заказ пока не создан.
+    {% elif attempt.status == "failed" %}
+      Не удалось подготовить онлайн-оплату. Заказ пока не создан.
+    {% else %}
+      Статус оплаты обновлён.
+    {% endif %}
+  </p>
+
+  <div class="status-box" style="margin:16px 0;display:grid;gap:10px;">
+    <div><b>Статус оплаты:</b> <span id="payment-status-label" class="status-badge">{{ attempt.get_status_display }}</span></div>
+    <div><b>Сумма к оплате:</b> {{ attempt.total }} ₽</div>
+    <div><b>Телефон:</b> {{ attempt.customer_phone }}</div>
+    {% if attempt.payment_id %}
+      <div><b>ID платежа ЮKassa:</b> <span style="word-break:break-all;">{{ attempt.payment_id }}</span></div>
+    {% endif %}
+  </div>
+
+  {% if payment_error %}
+    <div class="form-error" id="payment-error-box" style="margin-bottom:14px;">{{ payment_error }}</div>
+  {% else %}
+    <div class="form-error" id="payment-error-box" style="display:none;margin-bottom:14px;"></div>
+  {% endif %}
+
+  <div
+    id="payment-pending-box"
+    class="notice-box"
+    style="{% if attempt.status == 'pending' %}display:block;{% else %}display:none;{% endif %}margin-bottom:18px;"
+  >
+    Если банк и ЮKassa отвечают не мгновенно, эта страница сама дождётся подтверждения и перенаправит вас дальше.
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+    <a href="{% url 'orders:checkout' %}" class="btn btn-primary">Вернуться к оформлению</a>
+    <a href="{% url 'orders:cart' %}" class="btn">Открыть корзину</a>
+    <a href="{% url 'orders:order_lookup' %}" class="btn-link">Мои заказы</a>
+  </div>
+</div>
+
+<script>
+(function() {
+  const initialTerminal = {% if is_terminal %}true{% else %}false{% endif %};
+  if (initialTerminal) return;
+
+  const statusTextEl = document.getElementById("payment-status-text");
+  const statusLabelEl = document.getElementById("payment-status-label");
+  const pendingBoxEl = document.getElementById("payment-pending-box");
+  const errorBoxEl = document.getElementById("payment-error-box");
+  const statusUrl = "{% url 'orders:api_payment_status' attempt.public_id %}";
+
+  async function tick() {
+    const resp = await fetch(statusUrl, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    const data = await resp.json();
+
+    if (statusLabelEl && data.status_label) {
+      statusLabelEl.textContent = data.status_label;
+    }
+
+    if (data.redirect_url) {
+      window.location.href = data.redirect_url;
+      return false;
+    }
+
+    if (errorBoxEl) {
+      if (!resp.ok || data.error) {
+        errorBoxEl.textContent = data.error || "Не удалось обновить статус оплаты.";
+        errorBoxEl.style.display = "block";
+      } else {
+        errorBoxEl.textContent = "";
+        errorBoxEl.style.display = "none";
+      }
+    }
+
+    if (statusTextEl) {
+      if (data.status === "pending") {
+        statusTextEl.textContent = "Платёж ещё обрабатывается. Мы автоматически проверим статус повторно.";
+      } else if (data.status === "canceled") {
+        statusTextEl.textContent = "Платёж отменён. Заказ не был создан, корзина сохранена.";
+      } else if (data.status === "failed") {
+        statusTextEl.textContent = "Онлайн-оплата завершилась ошибкой. Заказ не был создан.";
+      }
+    }
+
+    if (pendingBoxEl) {
+      pendingBoxEl.style.display = data.status === "pending" ? "block" : "none";
+    }
+
+    return !data.is_terminal;
+  }
+
+  async function loop() {
+    try {
+      const shouldContinue = await tick();
+      if (!shouldContinue) return;
+    } catch (err) {
+      console.error("payment status poll error:", err);
+      if (errorBoxEl) {
+        errorBoxEl.textContent = "Проверка статуса временно недоступна. Повторим ещё раз автоматически.";
+        errorBoxEl.style.display = "block";
+      }
+    }
+    setTimeout(loop, 3000);
+  }
+
+  loop();
+})();
+</script>
+{% endblock %}

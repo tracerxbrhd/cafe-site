@@ -1,14 +1,16 @@
 from datetime import date, time
 from decimal import Decimal
+from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from core.models import BusinessLunchDay, BusinessLunchWeek, CafeSettings
 from promotions.models import PromoCode
 
 from .cart import LUNCH_CART_SESSION_KEY
-from .models import Order, OrderItem
+from .models import OnlinePaymentAttempt, Order, OrderItem
+from .yookassa import YooKassaPayment
 
 
 class CheckoutBusinessLunchTests(TestCase):
@@ -215,8 +217,25 @@ class CheckoutPromoCodeTests(TestCase):
             },
         )
 
-    def test_checkout_saves_payment_method_and_promo_discount(self):
+    @override_settings(
+        YOOKASSA_SHOP_ID="test_shop",
+        YOOKASSA_SECRET_KEY="test_key",
+    )
+    @patch("orders.views.create_yookassa_payment")
+    def test_checkout_online_redirects_to_yookassa_without_creating_order(self, create_payment_mock):
         self._set_lunch_in_session()
+        create_payment_mock.return_value = YooKassaPayment(
+            payment_id="pay_test_123",
+            status="pending",
+            confirmation_url="https://yookassa.test/checkout/pay_test_123",
+            raw={
+                "id": "pay_test_123",
+                "status": "pending",
+                "confirmation": {
+                    "confirmation_url": "https://yookassa.test/checkout/pay_test_123",
+                },
+            },
+        )
 
         response = self.client.post(
             reverse("orders:checkout"),
@@ -230,12 +249,20 @@ class CheckoutPromoCodeTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        order = Order.objects.get()
+        self.assertEqual(
+            response["Location"],
+            "https://yookassa.test/checkout/pay_test_123",
+        )
+        self.assertEqual(Order.objects.count(), 0)
+        self.assertEqual(OnlinePaymentAttempt.objects.count(), 1)
 
-        self.assertEqual(order.payment_method, Order.PaymentMethod.ONLINE)
-        self.assertEqual(order.promo_code, "SAVE10")
-        self.assertEqual(order.promo_discount_amount, Decimal("90.00"))
-        self.assertEqual(order.total, Decimal("810.00"))
+        attempt = OnlinePaymentAttempt.objects.get()
+        self.assertEqual(attempt.payment_method, Order.PaymentMethod.ONLINE)
+        self.assertEqual(attempt.promo_code, "SAVE10")
+        self.assertEqual(attempt.promo_discount_amount, Decimal("90.00"))
+        self.assertEqual(attempt.total, Decimal("810.00"))
+        self.assertEqual(attempt.payment_id, "pay_test_123")
+        self.assertIn(LUNCH_CART_SESSION_KEY, self.client.session)
 
     def test_checkout_rejects_expired_promo_code(self):
         self._set_lunch_in_session()
@@ -254,3 +281,69 @@ class CheckoutPromoCodeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Срок действия промокода истёк.")
         self.assertEqual(Order.objects.count(), 0)
+
+    @override_settings(
+        YOOKASSA_SHOP_ID="test_shop",
+        YOOKASSA_SECRET_KEY="test_key",
+    )
+    @patch("orders.views.get_yookassa_payment")
+    @patch("orders.views.create_yookassa_payment")
+    def test_payment_return_creates_order_only_after_successful_payment(
+        self,
+        create_payment_mock,
+        get_payment_mock,
+    ):
+        self._set_lunch_in_session()
+        create_payment_mock.return_value = YooKassaPayment(
+            payment_id="pay_test_456",
+            status="pending",
+            confirmation_url="https://yookassa.test/checkout/pay_test_456",
+            raw={
+                "id": "pay_test_456",
+                "status": "pending",
+                "confirmation": {
+                    "confirmation_url": "https://yookassa.test/checkout/pay_test_456",
+                },
+            },
+        )
+        get_payment_mock.return_value = YooKassaPayment(
+            payment_id="pay_test_456",
+            status="succeeded",
+            confirmation_url="",
+            raw={
+                "id": "pay_test_456",
+                "status": "succeeded",
+            },
+        )
+
+        checkout_response = self.client.post(
+            reverse("orders:checkout"),
+            data={
+                "fulfillment": Order.Fulfillment.PICKUP,
+                "payment_method": Order.PaymentMethod.ONLINE,
+                "customer_name": "Иван",
+                "customer_phone": "+7 (900) 123-45-67",
+                "promo_code": "save10",
+            },
+        )
+
+        self.assertEqual(checkout_response.status_code, 302)
+        attempt = OnlinePaymentAttempt.objects.get()
+        self.assertEqual(Order.objects.count(), 0)
+
+        response = self.client.get(
+            reverse("orders:payment_return", kwargs={"public_id": attempt.public_id})
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Order.objects.count(), 1)
+
+        order = Order.objects.get()
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.status, OnlinePaymentAttempt.Status.SUCCEEDED)
+        self.assertEqual(attempt.order, order)
+        self.assertEqual(order.payment_method, Order.PaymentMethod.ONLINE)
+        self.assertEqual(order.promo_code, "SAVE10")
+        self.assertEqual(order.promo_discount_amount, Decimal("90.00"))
+        self.assertEqual(order.total, Decimal("810.00"))
+        self.assertNotIn(LUNCH_CART_SESSION_KEY, self.client.session)

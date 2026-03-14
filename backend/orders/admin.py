@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST
 
 # from django.middleware.csrf import get_token
 
-from .models import Order, OrderItem
+from .models import OnlinePaymentAttempt, Order, OrderItem
 from .services import sync_order_telegram_message
 
 
@@ -614,3 +614,111 @@ class OrderAdmin(admin.ModelAdmin):
             return actions
 
         return {}
+
+
+@admin.register(OnlinePaymentAttempt)
+class OnlinePaymentAttemptAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "status",
+        "payment_id",
+        "customer_name",
+        "customer_phone",
+        "total",
+        "order_link",
+        "created_at",
+    )
+    list_filter = ("status", "fulfillment", "created_at")
+    search_fields = ("payment_id", "customer_name", "customer_phone", "public_id")
+    readonly_fields = (
+        "public_id",
+        "payment_id",
+        "idempotence_key",
+        "provider_status",
+        "confirmation_url",
+        "provider_payload",
+        "cart_snapshot",
+        "order",
+        "created_at",
+        "updated_at",
+    )
+
+    fieldsets = (
+        (
+            "Основное",
+            {
+                "fields": (
+                    "status",
+                    "payment_id",
+                    "provider_status",
+                    "confirmation_url",
+                    "order",
+                    "public_id",
+                    "idempotence_key",
+                )
+            },
+        ),
+        (
+            "Клиент",
+            {
+                "fields": (
+                    "customer_name",
+                    "customer_phone",
+                    "customer_comment",
+                )
+            },
+        ),
+        (
+            "Суммы",
+            {
+                "fields": (
+                    "items_total",
+                    "delivery_fee",
+                    "promo_code",
+                    "promo_discount_amount",
+                    "total",
+                )
+            },
+        ),
+        (
+            "Адрес",
+            {
+                "fields": (
+                    "fulfillment",
+                    "payment_method",
+                    "address_line",
+                    "address_entrance",
+                    "address_floor",
+                    "address_apartment",
+                    "delivery_zone_name",
+                    "delivery_zone_code",
+                    "delivery_lat",
+                    "delivery_lon",
+                )
+            },
+        ),
+        (
+            "Диагностика",
+            {
+                "classes": ("collapse",),
+                "fields": (
+                    "error_message",
+                    "cart_snapshot",
+                    "provider_payload",
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def order_link(self, obj):
+        if not obj.order_id:
+            return "—"
+        url = reverse("admin:orders_order_change", args=[obj.order_id])
+        return format_html('<a href="{}">заказ #{}</a>', url, obj.order_id)
+
+    order_link.short_description = "Заказ"

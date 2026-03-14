@@ -183,13 +183,20 @@
           </label>
         {% endfor %}
       </div>
+      <div class="{% if online_payment_enabled %}form-hint{% else %}form-error{% endif %}">
+        {% if online_payment_enabled %}
+          При выборе онлайн-оплаты вы будете перенаправлены в ЮKassa. Заказ создастся только после успешного подтверждения платежа.
+        {% else %}
+          Онлайн-оплата сейчас не настроена: добавьте тестовые ключи ЮKassa в <code>backend/.env</code>, чтобы проверить этот сценарий локально.
+        {% endif %}
+      </div>
       {% if form.payment_method.errors %}
         <div class="form-error">{{ form.payment_method.errors }}</div>
       {% endif %}
     </div>
 
     <div style="display:grid;gap:10px;margin-top:16px;">
-      <button type="submit" class="btn btn-primary">Подтвердить заказ</button>
+      <button type="submit" id="checkout-submit-btn" class="btn btn-primary">Подтвердить заказ</button>
       <a href="{% url 'orders:cart' %}" class="btn-link">Вернуться в корзину</a>
     </div>
   </aside>
@@ -232,6 +239,8 @@
   const zoneFeeEl = document.getElementById("delivery-zone-fee");
   const zoneMinEl = document.getElementById("delivery-zone-min");
   const zoneErrorEl = document.getElementById("delivery-zone-error");
+  const submitBtn = document.getElementById("checkout-submit-btn");
+  const paymentInputs = Array.from(form.querySelectorAll('[name="payment_method"]'));
 
   const quoteUrl = "{% url 'orders:api_delivery_quote' %}";
   const promoUrl = "{% url 'orders:api_apply_promo' %}";
@@ -265,6 +274,18 @@
     deliveryFeeEl.textContent = fee.toFixed(2);
     if (promoDiscountEl) promoDiscountEl.textContent = discount.toFixed(2);
     grandTotalEl.textContent = grand.toFixed(2);
+  }
+
+  function getSelectedPaymentMethod() {
+    const selected = paymentInputs.find((input) => input.checked);
+    return selected ? selected.value : "";
+  }
+
+  function syncSubmitLabel() {
+    if (!submitBtn) return;
+    submitBtn.textContent = getSelectedPaymentMethod() === "online"
+      ? "Перейти к оплате"
+      : "Подтвердить заказ";
   }
 
   function renderPromoState(code, discount, message, isError) {
@@ -628,6 +649,10 @@
     });
   }
 
+  paymentInputs.forEach((input) => {
+    input.addEventListener("change", syncSubmitLabel);
+  });
+
   if (initialPromoHasError) {
     renderPromoState("", 0, initialPromoMessage, true);
   } else {
@@ -641,6 +666,7 @@
     );
   }
   syncTotals();
+  syncSubmitLabel();
   initYandexMap();
 })();
 </script>

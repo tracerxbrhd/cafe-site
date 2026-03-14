@@ -9,9 +9,11 @@ urlpatterns = [
     path("checkout/", views.checkout_page, name="checkout"),
 
     path("success/<uuid:public_id>/", views.order_success_page, name="order_success"),
+    path("payment/<uuid:public_id>/return/", views.payment_return_page, name="payment_return"),
 
     path("order/<uuid:public_id>/", views.order_status_page, name="order_status"),
     path("api/order/<uuid:public_id>/", views.order_api_status, name="api_order_status"),
+    path("api/payment/<uuid:public_id>/status/", views.payment_api_status, name="api_payment_status"),
 
     path("api/add/", views.cart_api_add, name="api_add"),
     path("api/add-business-lunch/", views.cart_api_add_business_lunch, name="api_add_business_lunch"),

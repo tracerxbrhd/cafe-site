@@ -8,6 +8,11 @@
   <p style="margin-top:0;">
     Спасибо. Заказ <b>№{{ order.id }}</b> успешно создан.
   </p>
+  {% if order.payment_method == "online" %}
+    <div class="notice-box" style="margin:12px 0 18px;">
+      Онлайн-оплата подтверждена, заказ уже передан в обработку.
+    </div>
+  {% endif %}
 
   <div class="status-box" style="margin:16px 0;">
     <div><b>Статус:</b> <span class="status-badge">{{ order.get_status_display }}</span></div>

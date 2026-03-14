@@ -26,20 +26,18 @@
 #     cart_set,
 # )
 from decimal import Decimal
-import logging
 
 from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST, require_http_methods
 
 from core.models import BusinessLunchDay
 from core.utils import get_cafe_settings, get_delivery_quote
-from integrations.telegram.client import TelegramError, send_message
 from promotions.services import PromoCodeError, apply_promo_code
 
 from .cart import (
-    CART_SESSION_KEY,
     add_business_lunch,
     cart_add,
     cart_clear,
@@ -47,11 +45,22 @@ from .cart import (
     cart_get_qty,
     cart_lines,
     cart_set,
-    lunch_get_qty,
 )
 from .forms import CheckoutForm, OrderLookupPhoneForm, OrderLookupPublicIdForm
-from .models import Order, OrderItem
-from .notifications import build_order_status_keyboard, format_new_order_message
+from .models import OnlinePaymentAttempt, Order
+from .services import (
+    create_order_from_snapshot,
+    send_order_created_notification,
+    serialize_cart_lines,
+    sync_online_payment_attempt,
+)
+from .yookassa import (
+    YooKassaConfigurationError,
+    YooKassaError,
+    create_payment as create_yookassa_payment,
+    get_payment as get_yookassa_payment,
+    is_yookassa_configured,
+)
 
 
 ZERO_AMOUNT = Decimal("0.00")
@@ -83,6 +92,112 @@ def _resolve_promo_discount(form: CheckoutForm, items_total: Decimal) -> tuple[s
         return "", ZERO_AMOUNT, ""
 
     return result.code, result.discount_amount, result.discount_label
+
+
+def _create_order_from_checkout(
+    *,
+    lines,
+    fulfillment: str,
+    payment_method: str,
+    customer_name: str,
+    customer_phone: str,
+    customer_comment: str,
+    address_line: str,
+    address_entrance: str,
+    address_floor: str,
+    address_apartment: str,
+    delivery_lat,
+    delivery_lon,
+    delivery_zone_code: str,
+    delivery_zone_name: str,
+    delivery_fee: Decimal,
+    promo_code: str,
+    promo_discount: Decimal,
+):
+    order = create_order_from_snapshot(
+        fulfillment=fulfillment,
+        payment_method=payment_method,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        customer_comment=customer_comment,
+        address_line=address_line,
+        address_entrance=address_entrance,
+        address_floor=address_floor,
+        address_apartment=address_apartment,
+        delivery_lat=delivery_lat,
+        delivery_lon=delivery_lon,
+        delivery_zone_code=delivery_zone_code,
+        delivery_zone_name=delivery_zone_name,
+        delivery_fee=delivery_fee,
+        promo_code=promo_code,
+        promo_discount_amount=promo_discount,
+        cart_snapshot=serialize_cart_lines(lines),
+    )
+    send_order_created_notification(order)
+    return order
+
+
+def _create_online_payment_attempt(
+    *,
+    lines,
+    items_total: Decimal,
+    fulfillment: str,
+    payment_method: str,
+    customer_name: str,
+    customer_phone: str,
+    customer_comment: str,
+    address_line: str,
+    address_entrance: str,
+    address_floor: str,
+    address_apartment: str,
+    delivery_lat,
+    delivery_lon,
+    delivery_zone_code: str,
+    delivery_zone_name: str,
+    delivery_fee: Decimal,
+    promo_code: str,
+    promo_discount: Decimal,
+    grand_total: Decimal,
+):
+    return OnlinePaymentAttempt.objects.create(
+        fulfillment=fulfillment,
+        payment_method=payment_method,
+        customer_name=customer_name,
+        customer_phone=customer_phone,
+        customer_comment=customer_comment,
+        address_line=address_line,
+        address_entrance=address_entrance,
+        address_floor=address_floor,
+        address_apartment=address_apartment,
+        delivery_lat=Decimal(str(delivery_lat)).quantize(Decimal("0.000001"))
+        if delivery_lat is not None
+        else None,
+        delivery_lon=Decimal(str(delivery_lon)).quantize(Decimal("0.000001"))
+        if delivery_lon is not None
+        else None,
+        delivery_zone_code=delivery_zone_code,
+        delivery_zone_name=delivery_zone_name,
+        items_total=items_total,
+        delivery_fee=delivery_fee,
+        promo_code=promo_code,
+        promo_discount_amount=promo_discount,
+        total=grand_total,
+        cart_snapshot=serialize_cart_lines(lines),
+    )
+
+
+def _sync_attempt_from_provider(attempt: OnlinePaymentAttempt):
+    if not attempt.payment_id:
+        return attempt, None
+
+    payment = get_yookassa_payment(attempt.payment_id)
+    return sync_online_payment_attempt(attempt, payment.raw)
+
+
+def _clear_cart_for_attempt_if_unchanged(request, attempt: OnlinePaymentAttempt) -> None:
+    current_lines, _ = cart_lines(request.session)
+    if serialize_cart_lines(current_lines) == (attempt.cart_snapshot or []):
+        cart_clear(request.session)
 
 
 def cart_page(request):
@@ -575,88 +690,113 @@ def checkout_page(request):
             )
 
         if not form.errors:
-            order = Order.objects.create(
-                status=Order.Status.NEW,
-                fulfillment=fulfillment,
-                payment_method=form.cleaned_data["payment_method"],
-                customer_name=form.cleaned_data["customer_name"],
-                customer_phone=form.cleaned_data["customer_phone"],
-                customer_comment=form.cleaned_data.get("customer_comment", "") or "",
-                address_line=form.cleaned_data.get("address_line", "") or "",
-                address_entrance=form.cleaned_data.get("address_entrance", "") or "",
-                address_floor=form.cleaned_data.get("address_floor", "") or "",
-                address_apartment=form.cleaned_data.get("address_apartment", "") or "",
-                delivery_lat=Decimal(str(delivery_lat)).quantize(Decimal("0.000001")) if delivery_lat is not None else None,
-                delivery_lon=Decimal(str(delivery_lon)).quantize(Decimal("0.000001")) if delivery_lon is not None else None,
-                delivery_zone_code=quote.zone.code if quote and quote.zone else "",
-                delivery_zone_name=quote.zone.name if quote and quote.zone else "",
-                delivery_fee=delivery_fee,
-                promo_code=applied_promo_code,
-                promo_discount_amount=promo_discount,
-                total=ZERO_AMOUNT,
-            )
+            payment_method = form.cleaned_data["payment_method"]
 
-            order_total = ZERO_AMOUNT
-
-            for line in lines:
-                if line.kind == "product" and line.product:
-                    OrderItem.objects.create(
-                        order=order,
-                        product=line.product,
-                        product_name=line.product.name,
-                        unit_price=line.unit_price,
-                        quantity=line.qty,
-                        line_total=line.line_total,
-                    )
-
-                elif line.kind == "business_lunch" and line.lunch_day:
-                    OrderItem.objects.create(
-                        order=order,
-                        lunch_day=line.lunch_day,
-                        product_name=line.lunch_day.display_name,
-                        unit_price=line.unit_price,
-                        quantity=line.qty,
-                        line_total=line.line_total,
+            if payment_method == Order.PaymentMethod.ONLINE:
+                if not is_yookassa_configured():
+                    form.add_error(
+                        None,
+                        "Онлайн-оплата пока не настроена. Добавьте тестовые ключи ЮKassa в .env.",
                     )
                 else:
-                    continue
-
-                order_total += line.line_total
-
-            order_total = _discounted_items_total(order_total, promo_discount)
-            order_total += delivery_fee
-            order.total = order_total.quantize(Decimal("0.01"))
-            order.save(update_fields=["total"])
-
-            logger = logging.getLogger(__name__)
-
-            try:
-                result = send_message(
-                    format_new_order_message(order),
-                    reply_markup=build_order_status_keyboard(order),
-                )
-
-                telegram_result = (result or {}).get("result") or {}
-                chat = telegram_result.get("chat") or {}
-                message_id = telegram_result.get("message_id")
-                chat_id = chat.get("id")
-
-                if chat_id is not None and message_id is not None:
-                    order.telegram_chat_id = str(chat_id)
-                    order.telegram_message_id = int(message_id)
-                    order.save(
-                        update_fields=[
-                            "telegram_chat_id",
-                            "telegram_message_id",
-                            "updated_at",
-                        ]
+                    attempt = _create_online_payment_attempt(
+                        lines=lines,
+                        items_total=items_total,
+                        fulfillment=fulfillment,
+                        payment_method=payment_method,
+                        customer_name=form.cleaned_data["customer_name"],
+                        customer_phone=form.cleaned_data["customer_phone"],
+                        customer_comment=form.cleaned_data.get("customer_comment", "") or "",
+                        address_line=form.cleaned_data.get("address_line", "") or "",
+                        address_entrance=form.cleaned_data.get("address_entrance", "") or "",
+                        address_floor=form.cleaned_data.get("address_floor", "") or "",
+                        address_apartment=form.cleaned_data.get("address_apartment", "") or "",
+                        delivery_lat=delivery_lat,
+                        delivery_lon=delivery_lon,
+                        delivery_zone_code=quote.zone.code if quote and quote.zone else "",
+                        delivery_zone_name=quote.zone.name if quote and quote.zone else "",
+                        delivery_fee=delivery_fee,
+                        promo_code=applied_promo_code,
+                        promo_discount=promo_discount,
+                        grand_total=grand_total,
+                    )
+                    return_url = request.build_absolute_uri(
+                        reverse("orders:payment_return", kwargs={"public_id": attempt.public_id})
                     )
 
-            except TelegramError as e:
-                logger.exception("Telegram notification failed: %s", e)
+                    try:
+                        payment = create_yookassa_payment(
+                            amount=grand_total,
+                            description=f"Заказ в кафе Сказка ({attempt.customer_phone})",
+                            return_url=return_url,
+                            idempotence_key=str(attempt.idempotence_key),
+                            metadata={
+                                "payment_attempt_id": str(attempt.public_id),
+                                "customer_phone": attempt.customer_phone,
+                            },
+                        )
+                    except (YooKassaConfigurationError, YooKassaError) as exc:
+                        attempt.status = OnlinePaymentAttempt.Status.FAILED
+                        attempt.error_message = str(exc)
+                        attempt.save(update_fields=["status", "error_message", "updated_at"])
+                        form.add_error(None, str(exc))
+                    else:
+                        attempt.payment_id = payment.payment_id or None
+                        attempt.provider_status = payment.status
+                        attempt.provider_payload = payment.raw
+                        attempt.confirmation_url = payment.confirmation_url
+                        attempt.status = {
+                            "succeeded": OnlinePaymentAttempt.Status.SUCCEEDED,
+                            "canceled": OnlinePaymentAttempt.Status.CANCELED,
+                        }.get(payment.status, OnlinePaymentAttempt.Status.PENDING)
+                        attempt.save(
+                            update_fields=[
+                                "payment_id",
+                                "provider_status",
+                                "provider_payload",
+                                "confirmation_url",
+                                "status",
+                                "updated_at",
+                            ]
+                        )
+                        if payment.status == "succeeded":
+                            attempt, order = sync_online_payment_attempt(attempt, payment.raw)
+                            if order:
+                                cart_clear(request.session)
+                                return redirect("orders:order_success", public_id=order.public_id)
 
-            cart_clear(request.session)
-            return redirect("orders:order_success", public_id=order.public_id)
+                        if payment.confirmation_url:
+                            return redirect(payment.confirmation_url)
+
+                        attempt.status = OnlinePaymentAttempt.Status.FAILED
+                        attempt.error_message = (
+                            "ЮKassa не вернула ссылку на оплату. Попробуйте ещё раз."
+                        )
+                        attempt.save(update_fields=["status", "error_message", "updated_at"])
+                        form.add_error(None, attempt.error_message)
+
+            if not form.errors:
+                order = _create_order_from_checkout(
+                    lines=lines,
+                    fulfillment=fulfillment,
+                    payment_method=payment_method,
+                    customer_name=form.cleaned_data["customer_name"],
+                    customer_phone=form.cleaned_data["customer_phone"],
+                    customer_comment=form.cleaned_data.get("customer_comment", "") or "",
+                    address_line=form.cleaned_data.get("address_line", "") or "",
+                    address_entrance=form.cleaned_data.get("address_entrance", "") or "",
+                    address_floor=form.cleaned_data.get("address_floor", "") or "",
+                    address_apartment=form.cleaned_data.get("address_apartment", "") or "",
+                    delivery_lat=delivery_lat,
+                    delivery_lon=delivery_lon,
+                    delivery_zone_code=quote.zone.code if quote and quote.zone else "",
+                    delivery_zone_name=quote.zone.name if quote and quote.zone else "",
+                    delivery_fee=delivery_fee,
+                    promo_code=applied_promo_code,
+                    promo_discount=promo_discount,
+                )
+                cart_clear(request.session)
+                return redirect("orders:order_success", public_id=order.public_id)
 
     # Предварительный расчёт для отображения формы
     selected_fulfillment = (
@@ -693,6 +833,7 @@ def checkout_page(request):
             "promo_discount_label": promo_discount_label,
             "delivery_fee": delivery_fee,
             "grand_total": grand_total,
+            "online_payment_enabled": is_yookassa_configured(),
         },
     )
 
@@ -716,6 +857,121 @@ def order_api_status(request, public_id):
 def order_success_page(request, public_id):
     order = get_object_or_404(Order, public_id=public_id)
     return render(request, "orders/order_success.html", {"order": order})
+
+
+def payment_return_page(request, public_id):
+    attempt = get_object_or_404(
+        OnlinePaymentAttempt.objects.select_related("order"),
+        public_id=public_id,
+    )
+
+    if attempt.order_id:
+        _clear_cart_for_attempt_if_unchanged(request, attempt)
+        return redirect("orders:order_success", public_id=attempt.order.public_id)
+
+    payment_error = ""
+    if attempt.payment_id:
+        try:
+            attempt, order = _sync_attempt_from_provider(attempt)
+        except YooKassaError as exc:
+            payment_error = str(exc)
+            order = None
+        else:
+            if order:
+                _clear_cart_for_attempt_if_unchanged(request, attempt)
+                return redirect("orders:order_success", public_id=order.public_id)
+    else:
+        order = None
+        payment_error = attempt.error_message or "Платёж ЮKassa ещё не создан."
+
+    return render(
+        request,
+        "orders/payment_return.html",
+        {
+            "attempt": attempt,
+            "payment_error": payment_error,
+            "is_terminal": attempt.status in {
+                OnlinePaymentAttempt.Status.SUCCEEDED,
+                OnlinePaymentAttempt.Status.CANCELED,
+                OnlinePaymentAttempt.Status.FAILED,
+            },
+        },
+    )
+
+
+def payment_api_status(request, public_id):
+    attempt = get_object_or_404(
+        OnlinePaymentAttempt.objects.select_related("order"),
+        public_id=public_id,
+    )
+
+    if attempt.order_id:
+        _clear_cart_for_attempt_if_unchanged(request, attempt)
+        return JsonResponse(
+            {
+                "ok": True,
+                "status": attempt.status,
+                "status_label": attempt.get_status_display(),
+                "is_terminal": True,
+                "redirect_url": reverse(
+                    "orders:order_success",
+                    kwargs={"public_id": attempt.order.public_id},
+                ),
+            }
+        )
+
+    if not attempt.payment_id:
+        return JsonResponse(
+            {
+                "ok": False,
+                "status": attempt.status,
+                "status_label": attempt.get_status_display(),
+                "is_terminal": attempt.status
+                in {
+                    OnlinePaymentAttempt.Status.CANCELED,
+                    OnlinePaymentAttempt.Status.FAILED,
+                },
+                "error": attempt.error_message or "Платёж ЮKassa не найден.",
+            },
+            status=400,
+        )
+
+    try:
+        attempt, order = _sync_attempt_from_provider(attempt)
+    except YooKassaError as exc:
+        return JsonResponse(
+            {
+                "ok": False,
+                "status": attempt.status,
+                "status_label": attempt.get_status_display(),
+                "is_terminal": False,
+                "error": str(exc),
+            },
+            status=502,
+        )
+
+    payload = {
+        "ok": True,
+        "status": attempt.status,
+        "status_label": attempt.get_status_display(),
+        "is_terminal": attempt.status
+        in {
+            OnlinePaymentAttempt.Status.SUCCEEDED,
+            OnlinePaymentAttempt.Status.CANCELED,
+            OnlinePaymentAttempt.Status.FAILED,
+        },
+        "redirect_url": "",
+        "error": attempt.error_message,
+    }
+
+    if order:
+        _clear_cart_for_attempt_if_unchanged(request, attempt)
+        payload["redirect_url"] = reverse(
+            "orders:order_success",
+            kwargs={"public_id": order.public_id},
+        )
+
+    return JsonResponse(payload)
 
 
 @require_POST
