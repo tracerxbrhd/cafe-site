@@ -4,8 +4,9 @@
 {% block content %}
 <h1 class="section-title">Оформление заказа</h1>
 
-<div class="page-grid">
-  <form method="post" id="checkout-form" class="panel">
+<form method="post" id="checkout-form">
+  <div class="page-grid">
+  <div class="panel">
     {% csrf_token %}
 
     <h2 class="panel-title">Контактные данные</h2>
@@ -88,7 +89,7 @@
         {{ form.customer_comment }}
       </div>
     </div>
-  </form>
+  </div>
 
   <aside class="panel">
     <h2 class="panel-title">Ваш заказ</h2>
@@ -118,6 +119,48 @@
       <div><span id="checkout-items-total">{{ items_total }}</span> ₽</div>
     </div>
 
+    <div style="margin-top:16px;display:grid;gap:8px;">
+      <label class="form-label" for="{{ form.promo_code.id_for_label }}">Промокод</label>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 48px;gap:8px;align-items:start;">
+        <input
+          type="text"
+          name="{{ form.promo_code.html_name }}"
+          id="{{ form.promo_code.id_for_label }}"
+          value="{% if applied_promo_code %}{{ applied_promo_code }}{% else %}{{ form.promo_code.value|default_if_none:'' }}{% endif %}"
+          placeholder="Введите промокод"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button type="button" id="promo-apply-btn" class="btn-icon" aria-label="Применить промокод">→</button>
+      </div>
+      {% if form.promo_code.errors %}
+        <div class="form-error" id="promo-feedback">{{ form.promo_code.errors|striptags }}</div>
+      {% else %}
+        <div
+          id="promo-feedback"
+          class="{% if applied_promo_code %}form-hint{% else %}muted{% endif %}"
+        >
+          {% if applied_promo_code %}
+            Промокод {{ applied_promo_code }} применён.
+          {% else %}
+            Если у вас есть промокод на скидку, введите его и нажмите стрелку.
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div
+      class="order-total-row"
+      id="promo-discount-row"
+      style="{% if promo_discount > 0 %}display:flex;{% else %}display:none;{% endif %}"
+    >
+      <div class="muted">
+        Скидка
+        <span id="promo-code-label">{% if applied_promo_code %}({{ applied_promo_code }}){% endif %}</span>
+      </div>
+      <div>−<span id="checkout-promo-discount">{{ promo_discount }}</span> ₽</div>
+    </div>
+
     <div class="order-total-row" style="margin-top:0;padding-top:0;border-top:none;">
       <div class="muted">Доставка</div>
       <div><span id="checkout-delivery-fee">{{ delivery_fee }}</span> ₽</div>
@@ -128,12 +171,30 @@
       <div style="font-size:24px;font-weight:700;"><span id="checkout-grand-total">{{ grand_total }}</span> ₽</div>
     </div>
 
+    <div style="display:grid;gap:10px;margin-top:18px;">
+      <div class="form-label">Способ оплаты</div>
+      <div style="display:grid;gap:8px;">
+        {% for radio in form.payment_method %}
+          <label
+            style="display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #ddd;border-radius:12px;background:#fff;cursor:pointer;"
+          >
+            {{ radio.tag }}
+            <span style="line-height:1.45;">{{ radio.choice_label }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {% if form.payment_method.errors %}
+        <div class="form-error">{{ form.payment_method.errors }}</div>
+      {% endif %}
+    </div>
+
     <div style="display:grid;gap:10px;margin-top:16px;">
-      <button type="submit" form="checkout-form" class="btn btn-primary">Подтвердить заказ</button>
+      <button type="submit" class="btn btn-primary">Подтвердить заказ</button>
       <a href="{% url 'orders:cart' %}" class="btn-link">Вернуться в корзину</a>
     </div>
   </aside>
-</div>
+  </div>
+</form>
 
 
 {% comment %} {% if cafe_settings and cafe_settings.yandex_maps_api_key %}
@@ -157,6 +218,12 @@
   const lonInput = form.querySelector('[name="delivery_lon"]');
 
   const itemsTotalEl = document.getElementById("checkout-items-total");
+  const promoInput = document.getElementById("id_promo_code");
+  const promoApplyBtn = document.getElementById("promo-apply-btn");
+  const promoDiscountRow = document.getElementById("promo-discount-row");
+  const promoDiscountEl = document.getElementById("checkout-promo-discount");
+  const promoCodeLabelEl = document.getElementById("promo-code-label");
+  const promoFeedbackEl = document.getElementById("promo-feedback");
   const deliveryFeeEl = document.getElementById("checkout-delivery-fee");
   const grandTotalEl = document.getElementById("checkout-grand-total");
 
@@ -167,13 +234,18 @@
   const zoneErrorEl = document.getElementById("delivery-zone-error");
 
   const quoteUrl = "{% url 'orders:api_delivery_quote' %}";
+  const promoUrl = "{% url 'orders:api_apply_promo' %}";
   const itemsTotalValue = Number("{{ items_total }}".replace(",", "."));
   const defaultMinOrder = Number("{{ cafe_settings.min_order_amount|default:0 }}".replace(",", "."));
+  const initialPromoMessage = "{% if form.promo_code.errors %}{{ form.promo_code.errors|striptags|escapejs }}{% endif %}";
+  const initialPromoHasError = {% if form.promo_code.errors %}true{% else %}false{% endif %};
 
   let mapInstance = null;
   let placemark = null;
   let suggestView = null;
   let currentDeliveryFee = Number("{{ delivery_fee|default:0 }}".replace(",", "."));
+  let currentPromoDiscount = Number("{{ promo_discount|default:0 }}".replace(",", "."));
+  let appliedPromoCode = "{{ applied_promo_code|default:''|escapejs }}";
   let currentMinOrderAmount = defaultMinOrder;
 
   function syncDeliveryFields() {
@@ -187,10 +259,36 @@
     if (!itemsTotalEl || !deliveryFeeEl || !grandTotalEl) return;
     const isDelivery = fulfillmentField && fulfillmentField.value === "delivery";
     const fee = isDelivery ? currentDeliveryFee : 0;
-    const grand = itemsTotalValue + fee;
+    const discount = Math.min(currentPromoDiscount, itemsTotalValue);
+    const grand = Math.max(0, itemsTotalValue - discount) + fee;
 
     deliveryFeeEl.textContent = fee.toFixed(2);
+    if (promoDiscountEl) promoDiscountEl.textContent = discount.toFixed(2);
     grandTotalEl.textContent = grand.toFixed(2);
+  }
+
+  function renderPromoState(code, discount, message, isError) {
+    currentPromoDiscount = Number(discount || 0);
+    appliedPromoCode = code || "";
+
+    if (promoInput && appliedPromoCode) {
+      promoInput.value = appliedPromoCode;
+    }
+
+    if (promoDiscountRow) {
+      promoDiscountRow.style.display = currentPromoDiscount > 0 ? "flex" : "none";
+    }
+
+    if (promoCodeLabelEl) {
+      promoCodeLabelEl.textContent = appliedPromoCode ? `(${appliedPromoCode})` : "";
+    }
+
+    if (promoFeedbackEl) {
+      promoFeedbackEl.textContent = message || "";
+      promoFeedbackEl.className = isError ? "form-error" : (appliedPromoCode ? "form-hint" : "muted");
+    }
+
+    syncTotals();
   }
 
   function extractDigits(value) {
@@ -265,6 +363,34 @@
     return await resp.json();
   }
 
+  async function requestPromo(code) {
+    const body = new URLSearchParams({
+      promo_code: String(code || ""),
+    });
+
+    const csrftoken = document.cookie
+      .split("; ")
+      .find(v => v.startsWith("csrftoken="))
+      ?.split("=")[1] || "";
+
+    const resp = await fetch(promoUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRFToken": csrftoken,
+      },
+      body: body.toString(),
+    });
+
+    const data = await resp.json();
+    if (!resp.ok || !data.ok) {
+      throw new Error(data.error || `HTTP ${resp.status}`);
+    }
+
+    return data;
+  }
+
   function renderQuote(data) {
     if (!quoteBox || !zoneNameEl || !zoneFeeEl || !zoneMinEl || !zoneErrorEl) return;
 
@@ -308,6 +434,27 @@
         zoneErrorEl.textContent = "Не удалось определить стоимость доставки";
         zoneErrorEl.style.display = "block";
       }
+    }
+  }
+
+  async function applyPromoCode() {
+    if (!promoInput || !promoApplyBtn) return;
+
+    promoApplyBtn.disabled = true;
+
+    try {
+      const data = await requestPromo(promoInput.value);
+      renderPromoState(
+        data.promo_code || "",
+        Number(String(data.discount_amount || "0").replace(",", ".")),
+        data.message || "Промокод применён.",
+        false
+      );
+    } catch (err) {
+      console.error("promo apply error:", err);
+      renderPromoState("", 0, err.message || "Не удалось применить промокод.", true);
+    } finally {
+      promoApplyBtn.disabled = false;
     }
   }
 
@@ -459,6 +606,40 @@
     }
   }
 
+  if (promoInput) {
+    promoInput.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyPromoCode();
+      }
+    });
+
+    promoInput.addEventListener("input", function() {
+      const raw = (promoInput.value || "").trim().toUpperCase();
+      if (appliedPromoCode && raw !== appliedPromoCode) {
+        renderPromoState("", 0, "Промокод изменён. Нажмите стрелку, чтобы применить его заново.", false);
+      }
+    });
+  }
+
+  if (promoApplyBtn) {
+    promoApplyBtn.addEventListener("click", function() {
+      applyPromoCode();
+    });
+  }
+
+  if (initialPromoHasError) {
+    renderPromoState("", 0, initialPromoMessage, true);
+  } else {
+    renderPromoState(
+      appliedPromoCode,
+      currentPromoDiscount,
+      appliedPromoCode
+        ? `Промокод ${appliedPromoCode} применён.`
+        : "Если у вас есть промокод на скидку, введите его и нажмите стрелку.",
+      false
+    );
+  }
   syncTotals();
   initYandexMap();
 })();

@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.models import BusinessLunchDay, BusinessLunchWeek, CafeSettings
+from promotions.models import PromoCode
 
 from .cart import LUNCH_CART_SESSION_KEY
 from .models import Order, OrderItem
@@ -54,6 +55,7 @@ class CheckoutBusinessLunchTests(TestCase):
             reverse("orders:checkout"),
             data={
                 "fulfillment": Order.Fulfillment.PICKUP,
+                "payment_method": Order.PaymentMethod.UPON_RECEIPT,
                 "customer_name": "Иван",
                 "customer_phone": "+7 (900) 123-45-67",
             },
@@ -99,6 +101,14 @@ class OrderLookupTests(TestCase):
             customer_phone=self.phone,
             total=Decimal("980.00"),
         )
+        OrderItem.objects.create(
+            order=self.active_order,
+            product=None,
+            product_name="Борщ",
+            unit_price=Decimal("320.00"),
+            quantity=2,
+            line_total=Decimal("640.00"),
+        )
 
     def test_lookup_by_public_id_shows_order(self):
         response = self.client.get(
@@ -130,3 +140,117 @@ class OrderLookupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Идентификатор заказа")
         self.assertContains(response, str(self.active_order.public_id))
+
+    def test_order_status_page_shows_order_items(self):
+        response = self.client.get(
+            reverse("orders:order_status", kwargs={"public_id": self.active_order.public_id})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Состав заказа")
+        self.assertContains(response, "Борщ × 2")
+
+
+class CheckoutPromoCodeTests(TestCase):
+    def setUp(self):
+        CafeSettings.objects.create(
+            is_open=True,
+            opening_time=time(0, 0),
+            closing_time=time(0, 0),
+            min_order_amount=Decimal("0.00"),
+        )
+        week = BusinessLunchWeek.objects.create(
+            title="Промо-неделя",
+            slug="promo-week",
+            week_start=date(2026, 3, 9),
+            week_end=date(2026, 3, 15),
+            is_active=True,
+            is_published=True,
+        )
+        self.lunch_day = BusinessLunchDay.objects.create(
+            week=week,
+            service_date=date(2026, 3, 14),
+            title="Промо-ланч",
+            price=Decimal("450.00"),
+            is_active=True,
+        )
+        self.valid_promo = PromoCode.objects.create(
+            code="SAVE10",
+            discount_type=PromoCode.DiscountType.PERCENT,
+            discount_value=10,
+            valid_until=date(2026, 3, 31),
+            is_active=True,
+        )
+        self.expired_promo = PromoCode.objects.create(
+            code="OLD100",
+            discount_type=PromoCode.DiscountType.FIXED,
+            discount_value=100,
+            valid_until=date(2026, 3, 1),
+            is_active=True,
+        )
+
+    def _set_lunch_in_session(self, qty=2):
+        session = self.client.session
+        session[LUNCH_CART_SESSION_KEY] = {str(self.lunch_day.id): qty}
+        session.save()
+
+    def test_apply_promo_api_returns_discount(self):
+        self._set_lunch_in_session()
+
+        response = self.client.post(
+            reverse("orders:api_apply_promo"),
+            data={"promo_code": "save10"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(
+            response.content,
+            {
+                "ok": True,
+                "promo_code": "SAVE10",
+                "discount_amount": "90.00",
+                "discount_label": "10%",
+                "discounted_items_total": "810.00",
+                "message": "Промокод применён.",
+            },
+        )
+
+    def test_checkout_saves_payment_method_and_promo_discount(self):
+        self._set_lunch_in_session()
+
+        response = self.client.post(
+            reverse("orders:checkout"),
+            data={
+                "fulfillment": Order.Fulfillment.PICKUP,
+                "payment_method": Order.PaymentMethod.ONLINE,
+                "customer_name": "Иван",
+                "customer_phone": "+7 (900) 123-45-67",
+                "promo_code": "save10",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        order = Order.objects.get()
+
+        self.assertEqual(order.payment_method, Order.PaymentMethod.ONLINE)
+        self.assertEqual(order.promo_code, "SAVE10")
+        self.assertEqual(order.promo_discount_amount, Decimal("90.00"))
+        self.assertEqual(order.total, Decimal("810.00"))
+
+    def test_checkout_rejects_expired_promo_code(self):
+        self._set_lunch_in_session()
+
+        response = self.client.post(
+            reverse("orders:checkout"),
+            data={
+                "fulfillment": Order.Fulfillment.PICKUP,
+                "payment_method": Order.PaymentMethod.UPON_RECEIPT,
+                "customer_name": "Иван",
+                "customer_phone": "+7 (900) 123-45-67",
+                "promo_code": "old100",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Срок действия промокода истёк.")
+        self.assertEqual(Order.objects.count(), 0)

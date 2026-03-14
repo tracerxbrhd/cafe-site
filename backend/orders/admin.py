@@ -133,6 +133,7 @@ class OrderAdmin(admin.ModelAdmin):
         "id",
         "status_badge",
         "fulfillment_badge",
+        "payment_method",
         "customer_name",
         "customer_phone",
         "short_items",
@@ -178,7 +179,10 @@ class OrderAdmin(admin.ModelAdmin):
                     "status",
                     "status_controls",
                     "fulfillment",
+                    "payment_method",
                     "total",
+                    "promo_code",
+                    "promo_discount_amount",
                     "public_id",
                 )
             },
@@ -583,6 +587,8 @@ class OrderAdmin(admin.ModelAdmin):
             "delivery_zone_code",
             "delivery_zone_name",
             "delivery_fee",
+            "promo_code",
+            "promo_discount_amount",
         ]
 
         if request.user.is_superuser:
@@ -591,6 +597,7 @@ class OrderAdmin(admin.ModelAdmin):
         return base_readonly + [
             "status",
             "fulfillment",
+            "payment_method",
             "customer_name",
             "customer_phone",
             "customer_comment",

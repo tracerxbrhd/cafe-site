@@ -28,8 +28,12 @@ class CheckoutForm(forms.Form):
         choices=Order.Fulfillment.choices,
         initial=Order.Fulfillment.DELIVERY,
     )
+    payment_method = forms.ChoiceField(
+        choices=Order.PaymentMethod.choices,
+        initial=Order.PaymentMethod.UPON_RECEIPT,
+        widget=forms.RadioSelect,
+    )
     customer_name = forms.CharField(max_length=120)
-    # customer_phone = forms.CharField(max_length=32)
     customer_phone = forms.CharField(
         max_length=32,
         widget=forms.TextInput(
@@ -50,6 +54,17 @@ class CheckoutForm(forms.Form):
         required=False,
         widget=forms.Textarea(attrs={"rows": 3}),
     )
+    promo_code = forms.CharField(
+        required=False,
+        max_length=32,
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "Введите промокод",
+                "autocomplete": "off",
+                "spellcheck": "false",
+            }
+        ),
+    )
 
     delivery_lat = forms.CharField(required=False, widget=forms.HiddenInput())
     delivery_lon = forms.CharField(required=False, widget=forms.HiddenInput())
@@ -62,6 +77,9 @@ class CheckoutForm(forms.Form):
 
     def clean_customer_phone(self):
         return normalize_phone_number(self.cleaned_data.get("customer_phone"))
+
+    def clean_promo_code(self):
+        return (self.cleaned_data.get("promo_code") or "").strip().upper()
 
     def clean(self):
         cleaned = super().clean()

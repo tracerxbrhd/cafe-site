@@ -32,8 +32,26 @@
 
     <div style="display:grid;gap:10px;margin-top:8px;">
       <div><b>Способ получения:</b> {{ order.get_fulfillment_display }}</div>
+      <div><b>Оплата:</b> {{ order.get_payment_method_display }}</div>
+      {% if order.promo_code and order.promo_discount_amount > 0 %}
+        <div><b>Промокод:</b> {{ order.promo_code }} (−{{ order.promo_discount_amount }} ₽)</div>
+      {% endif %}
       <div><b>Итого:</b> <span id="order-total">{{ order.total }}</span> ₽</div>
       <div class="muted">Обновлено: <span id="order-updated">{{ order.updated_at }}</span></div>
+    </div>
+
+    <div class="order-total-row" style="align-items:start;">
+      <div class="muted">Состав заказа</div>
+      <div style="display:grid;gap:8px;justify-items:end;text-align:right;">
+        {% for item in order.items.all %}
+          <div>
+            <div>{{ item.product_name }} × {{ item.quantity }}</div>
+            <div class="muted" style="font-size:13px;">{{ item.line_total }} ₽</div>
+          </div>
+        {% empty %}
+          <div class="muted">Состав заказа пока недоступен.</div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 </div>

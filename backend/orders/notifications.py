@@ -52,6 +52,7 @@ def format_new_order_message(order: Order) -> str:
     lines.append(f"<b>Заказ №{order.id}</b>")
     lines.append(f"<b>Статус:</b> {order.get_status_display()}")
     lines.append(f"<b>Способ:</b> {order.get_fulfillment_display()}")
+    lines.append(f"<b>Оплата:</b> {order.get_payment_method_display()}")
     lines.append(f"<b>Имя:</b> {order.customer_name}")
     lines.append(f"<b>Телефон:</b> {order.customer_phone}")
 
@@ -74,6 +75,9 @@ def format_new_order_message(order: Order) -> str:
 
     if order.customer_comment:
         lines.append(f"<b>Комментарий:</b> {order.customer_comment}")
+
+    if order.promo_code and order.promo_discount_amount:
+        lines.append(f"<b>Промокод:</b> {order.promo_code} (-{order.promo_discount_amount} ₽)")
 
     lines.append("")
     lines.append("<b>Состав:</b>")

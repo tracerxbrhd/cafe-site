@@ -12,7 +12,11 @@
   <div class="status-box" style="margin:16px 0;">
     <div><b>Статус:</b> <span class="status-badge">{{ order.get_status_display }}</span></div>
     <div><b>Способ получения:</b> {{ order.get_fulfillment_display }}</div>
+    <div><b>Оплата:</b> {{ order.get_payment_method_display }}</div>
     <div><b>Телефон:</b> {{ order.customer_phone }}</div>
+    {% if order.promo_code and order.promo_discount_amount > 0 %}
+      <div><b>Промокод:</b> {{ order.promo_code }} (−{{ order.promo_discount_amount }} ₽)</div>
+    {% endif %}
     <div><b>Итого:</b> {{ order.total }} ₽</div>
   </div>
 

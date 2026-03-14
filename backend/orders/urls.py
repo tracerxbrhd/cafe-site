@@ -18,5 +18,6 @@ urlpatterns = [
     path("api/set/", views.cart_api_set, name="api_set"),
     path("api/clear/", views.cart_api_clear, name="api_clear"),
     path("api/summary/", views.cart_api_summary, name="api_summary"),
+    path("api/apply-promo/", views.checkout_api_apply_promo, name="api_apply_promo"),
     path("api/delivery-quote/", views.delivery_api_quote, name="api_delivery_quote"),
 ]

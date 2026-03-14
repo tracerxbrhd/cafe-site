@@ -36,6 +36,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 from core.models import BusinessLunchDay
 from core.utils import get_cafe_settings, get_delivery_quote
 from integrations.telegram.client import TelegramError, send_message
+from promotions.services import PromoCodeError, apply_promo_code
 
 from .cart import (
     CART_SESSION_KEY,
@@ -53,6 +54,35 @@ from .models import Order, OrderItem
 from .notifications import build_order_status_keyboard, format_new_order_message
 
 
+ZERO_AMOUNT = Decimal("0.00")
+
+
+def _discounted_items_total(items_total: Decimal, promo_discount: Decimal) -> Decimal:
+    return max(ZERO_AMOUNT, items_total - promo_discount).quantize(Decimal("0.01"))
+
+
+def _checkout_grand_total(
+    items_total: Decimal,
+    promo_discount: Decimal,
+    delivery_fee: Decimal,
+) -> Decimal:
+    return (_discounted_items_total(items_total, promo_discount) + delivery_fee).quantize(
+        Decimal("0.01")
+    )
+
+
+def _resolve_promo_discount(form: CheckoutForm, items_total: Decimal) -> tuple[str, Decimal, str]:
+    promo_code = (form.cleaned_data.get("promo_code") or "").strip()
+    if not promo_code:
+        return "", ZERO_AMOUNT, ""
+
+    try:
+        result = apply_promo_code(promo_code, items_total)
+    except PromoCodeError as exc:
+        form.add_error("promo_code", str(exc))
+        return "", ZERO_AMOUNT, ""
+
+    return result.code, result.discount_amount, result.discount_label
 
 
 def cart_page(request):
@@ -493,40 +523,51 @@ def checkout_page(request):
 
     form = CheckoutForm(request.POST or None)
 
-    delivery_fee = Decimal("0.00")
+    delivery_fee = ZERO_AMOUNT
+    promo_discount = ZERO_AMOUNT
+    applied_promo_code = ""
+    promo_discount_label = ""
     grand_total = items_total
 
-    if request.method == "POST" and form.is_valid():
-        fulfillment = form.cleaned_data["fulfillment"]
-        min_order_amount = cafe_settings.min_order_amount if cafe_settings else Decimal("0.00")
+    if request.method == "POST":
+        form.is_valid()
+
+        applied_promo_code, promo_discount, promo_discount_label = _resolve_promo_discount(
+            form, items_total
+        )
+
+        fulfillment = form.cleaned_data.get("fulfillment")
+        min_order_amount = cafe_settings.min_order_amount if cafe_settings else ZERO_AMOUNT
 
         quote = None
         delivery_lat = None
         delivery_lon = None
 
         if fulfillment == Order.Fulfillment.DELIVERY:
-            delivery_lat = float(form.cleaned_data["delivery_lat"])
-            delivery_lon = float(form.cleaned_data["delivery_lon"])
-            quote = get_delivery_quote(
-                lat=delivery_lat,
-                lon=delivery_lon,
-                fulfillment=fulfillment,
-            )
-
-            if not quote.is_deliverable:
-                form.add_error(
-                    "address_line",
-                    quote.reason or "Адрес вне зоны доставки."
+            try:
+                delivery_lat = float(form.cleaned_data["delivery_lat"])
+                delivery_lon = float(form.cleaned_data["delivery_lon"])
+                quote = get_delivery_quote(
+                    lat=delivery_lat,
+                    lon=delivery_lon,
+                    fulfillment=fulfillment,
                 )
-            else:
-                delivery_fee = quote.delivery_fee
-                min_order_amount = quote.min_order_amount
+
+                if not quote.is_deliverable:
+                    form.add_error(
+                        "address_line",
+                        quote.reason or "Адрес вне зоны доставки."
+                    )
+                else:
+                    delivery_fee = quote.delivery_fee
+                    min_order_amount = quote.min_order_amount
+            except Exception:
+                delivery_fee = ZERO_AMOUNT
         else:
-            delivery_fee = Decimal("0.00")
+            delivery_fee = ZERO_AMOUNT
 
-        grand_total = items_total + delivery_fee
+        grand_total = _checkout_grand_total(items_total, promo_discount, delivery_fee)
 
-        # Рекомендуемая логика: минимальная сумма считается по товарам, без доставки
         if not form.errors and items_total < min_order_amount:
             form.add_error(
                 None,
@@ -537,6 +578,7 @@ def checkout_page(request):
             order = Order.objects.create(
                 status=Order.Status.NEW,
                 fulfillment=fulfillment,
+                payment_method=form.cleaned_data["payment_method"],
                 customer_name=form.cleaned_data["customer_name"],
                 customer_phone=form.cleaned_data["customer_phone"],
                 customer_comment=form.cleaned_data.get("customer_comment", "") or "",
@@ -549,47 +591,13 @@ def checkout_page(request):
                 delivery_zone_code=quote.zone.code if quote and quote.zone else "",
                 delivery_zone_name=quote.zone.name if quote and quote.zone else "",
                 delivery_fee=delivery_fee,
-                total=Decimal("0.00"),
+                promo_code=applied_promo_code,
+                promo_discount_amount=promo_discount,
+                total=ZERO_AMOUNT,
             )
 
-            order_total = Decimal("0.00")
+            order_total = ZERO_AMOUNT
 
-            # for line in lines:
-            #     item = OrderItem.objects.create(
-            #         order=order,
-            #         product=line.product,
-            #         product_name=line.product.name,
-            #         unit_price=line.product.price,
-            #         quantity=line.qty,
-            #         line_total=line.line_total,
-            #     )
-            #     order_total += item.line_total
-            # for line in lines:
-            #     if line.kind == "product" and line.product:
-            #         item = OrderItem.objects.create(
-            #             order=order,
-            #             product=line.product,
-            #             product_name=line.product.name,
-            #             unit_price=line.unit_price,
-            #             quantity=line.qty,
-            #             line_total=line.line_total,
-            #         )
-            #     elif line.kind == "business_lunch" and line.lunch_day:
-            #         composition_parts = []
-            #         for comp in line.lunch_day.items.all():
-            #             if comp.role:
-            #                 composition_parts.append(f"{comp.role}: {comp.product.name}")
-            #             else:
-            #                 composition_parts.append(comp.product.name)
-
-            #         item = OrderItem.objects.create(
-            #             order=order,
-            #             product=None,
-            #             product_name=line.lunch_day.display_name,
-            #             unit_price=line.unit_price,
-            #             quantity=line.qty,
-            #             line_total=line.line_total,
-            #         )
             for line in lines:
                 if line.kind == "product" and line.product:
                     OrderItem.objects.create(
@@ -615,6 +623,7 @@ def checkout_page(request):
 
                 order_total += line.line_total
 
+            order_total = _discounted_items_total(order_total, promo_discount)
             order_total += delivery_fee
             order.total = order_total.quantize(Decimal("0.01"))
             order.save(update_fields=["total"])
@@ -668,9 +677,9 @@ def checkout_page(request):
             if quote.is_deliverable:
                 delivery_fee = quote.delivery_fee
         except Exception:
-            delivery_fee = Decimal("0.00")
+            delivery_fee = ZERO_AMOUNT
 
-    grand_total = items_total + delivery_fee
+    grand_total = _checkout_grand_total(items_total, promo_discount, delivery_fee)
 
     return render(
         request,
@@ -679,6 +688,9 @@ def checkout_page(request):
             "form": form,
             "lines": lines,
             "items_total": items_total,
+            "promo_discount": promo_discount,
+            "applied_promo_code": applied_promo_code,
+            "promo_discount_label": promo_discount_label,
             "delivery_fee": delivery_fee,
             "grand_total": grand_total,
         },
@@ -686,7 +698,7 @@ def checkout_page(request):
 
 
 def order_status_page(request, public_id):
-    order = get_object_or_404(Order, public_id=public_id)
+    order = get_object_or_404(Order.objects.prefetch_related("items"), public_id=public_id)
     return render(request, "orders/order_status.html", {"order": order})
 
 def order_api_status(request, public_id):
@@ -704,6 +716,44 @@ def order_api_status(request, public_id):
 def order_success_page(request, public_id):
     order = get_object_or_404(Order, public_id=public_id)
     return render(request, "orders/order_success.html", {"order": order})
+
+
+@require_POST
+def checkout_api_apply_promo(request):
+    lines, items_total = cart_lines(request.session)
+    if not lines:
+        return JsonResponse({"ok": False, "error": "Корзина пуста."}, status=400)
+
+    raw_promo_code = request.POST.get("promo_code", "")
+    if not raw_promo_code.strip():
+        return JsonResponse(
+            {
+                "ok": True,
+                "promo_code": "",
+                "discount_amount": "0.00",
+                "discount_label": "",
+                "discounted_items_total": str(items_total.quantize(Decimal("0.01"))),
+                "message": "Промокод сброшен.",
+            }
+        )
+
+    try:
+        result = apply_promo_code(raw_promo_code, items_total)
+    except PromoCodeError as exc:
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "promo_code": result.code,
+            "discount_amount": str(result.discount_amount),
+            "discount_label": result.discount_label,
+            "discounted_items_total": str(
+                _discounted_items_total(items_total, result.discount_amount)
+            ),
+            "message": "Промокод применён.",
+        }
+    )
 
 
 @require_POST

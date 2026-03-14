@@ -17,8 +17,18 @@ class Order(models.Model):
         DELIVERY = "delivery", "Доставка"
         PICKUP = "pickup", "Самовывоз"
 
+    class PaymentMethod(models.TextChoices):
+        UPON_RECEIPT = "upon_receipt", "Оплата при получении (наличные/перевод)"
+        ONLINE = "online", "Оплата онлайн"
+
     status = models.CharField("Статус", max_length=20, choices=Status.choices, default=Status.NEW)
     fulfillment = models.CharField("Способ получения", max_length=20, choices=Fulfillment.choices, default=Fulfillment.DELIVERY)
+    payment_method = models.CharField(
+        "Способ оплаты",
+        max_length=24,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.UPON_RECEIPT,
+    )
 
     customer_name = models.CharField("Имя", max_length=120)
     customer_phone = models.CharField("Телефон", max_length=32)
@@ -61,6 +71,14 @@ class Order(models.Model):
 
     delivery_fee = models.DecimalField(
         "Стоимость доставки",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+
+    promo_code = models.CharField("Промокод", max_length=32, blank=True)
+    promo_discount_amount = models.DecimalField(
+        "Сумма скидки по промокоду",
         max_digits=10,
         decimal_places=2,
         default=0,
