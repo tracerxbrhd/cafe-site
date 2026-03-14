@@ -102,3 +102,28 @@ def answer_callback_query(callback_query_id: str, text: str = "") -> dict:
         payload["text"] = text
 
     return _post("answerCallbackQuery", payload)
+
+
+def get_updates(
+    *,
+    offset: int | None = None,
+    timeout: int = 30,
+    allowed_updates: list[str] | None = None,
+) -> list[dict]:
+    payload: dict = {
+        "timeout": timeout,
+    }
+    if offset is not None:
+        payload["offset"] = offset
+    if allowed_updates is not None:
+        payload["allowed_updates"] = allowed_updates
+
+    result = _post("getUpdates", payload)
+    return result.get("result") or []
+
+
+def delete_webhook(*, drop_pending_updates: bool = False) -> dict:
+    payload = {
+        "drop_pending_updates": drop_pending_updates,
+    }
+    return _post("deleteWebhook", payload)

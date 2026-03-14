@@ -176,6 +176,7 @@ TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 TELEGRAM_NOTIFICATIONS_ENABLED=0
 TELEGRAM_WEBHOOK_SECRET=random-secret
+TELEGRAM_POLLING_ENABLED=1
 
 YOOKASSA_SHOP_ID=
 YOOKASSA_SECRET_KEY=
@@ -209,13 +210,111 @@ curl http://SERVER_IP/healthz/
 
 значит стек поднялся корректно.
 
+### Telegram-кнопки статусов на проде
+
+Сейчас проект поддерживает быстрый рабочий режим без домена и `HTTPS`:
+
+- отдельный контейнер `bot`
+- long polling к Telegram API
+- кнопки статусов в Telegram работают даже если сайт открыт только по `http://SERVER_IP`
+
+Для этого в `backend/.env.production` должно быть:
+
+```env
+TELEGRAM_NOTIFICATIONS_ENABLED=1
+TELEGRAM_POLLING_ENABLED=1
+```
+
+Проверить состояние bot-контейнера:
+
+```bash
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml ps
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml logs -f bot
+```
+
 ## 7. Создание superuser
 
 ```bash
 docker compose --env-file backend/.env.production -f docker-compose.prod.yml exec web python manage.py createsuperuser
 ```
 
-## 8. Полезные команды
+## 8. Как перенести текущую локальную БД на сервер
+
+Рекомендуемый способ: не копировать docker volume напрямую, а сделать дамп PostgreSQL и восстановить его на сервере.
+
+Это самый безопасный и переносимый вариант.
+
+### 8.1. Создать дамп на локальной машине
+
+Из корня проекта на локальной машине:
+
+```powershell
+docker compose exec -T db pg_dump -U cafe_user -d cafe_skazka --clean --if-exists > cafe_skazka_local.sql
+```
+
+В результате рядом с проектом появится файл `cafe_skazka_local.sql`.
+
+### 8.2. Загрузить дамп на сервер
+
+Через `WinSCP` загрузите файл, например, в:
+
+```bash
+/opt/cafe-site/cafe_skazka_local.sql
+```
+
+### 8.3. Остановить веб-контейнер перед восстановлением
+
+На сервере:
+
+```bash
+cd /opt/cafe-site
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml stop web
+```
+
+### 8.4. Восстановить дамп в PostgreSQL на сервере
+
+Если production-стек уже поднят, выполните:
+
+```bash
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml exec -T db \
+  sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < cafe_skazka_local.sql
+```
+
+После этого серверная база станет копией локальной.
+
+### 8.5. Снова запустить приложение
+
+```bash
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml up -d
+```
+
+### 8.6. Проверить, что данные на месте
+
+```bash
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml exec web python manage.py showmigrations
+curl http://SERVER_IP/healthz/
+```
+
+Потом проверьте сайт и админку в браузере.
+
+### 8.7. Если на сайте есть загруженные изображения
+
+Одной базы недостаточно, если у вас уже есть файлы в `media`.
+
+Тогда нужно ещё перенести содержимое локальной папки `backend/media` в server volume `media_data`.
+Самый простой практический путь:
+
+1. Локально скачать или скопировать содержимое `backend/media`
+2. Загрузить эти файлы на сервер во временную папку, например `/opt/cafe-site/media-import`
+3. Из директории `/opt/cafe-site` скопировать их в контейнер:
+
+```bash
+docker cp ./media-import/. $(docker compose --env-file backend/.env.production -f docker-compose.prod.yml ps -q web):/app/media/
+```
+
+Если захотите, этот шаг лучше сделать отдельно и аккуратно, чтобы не потерять уже загруженные файлы.
+
+## 9. Полезные команды
 
 Логи:
 
@@ -227,6 +326,12 @@ docker compose --env-file backend/.env.production -f docker-compose.prod.yml log
 
 ```bash
 docker compose --env-file backend/.env.production -f docker-compose.prod.yml logs -f web
+```
+
+Логи Telegram polling:
+
+```bash
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml logs -f bot
 ```
 
 Проверка deploy-настроек Django:
@@ -248,7 +353,22 @@ docker compose --env-file backend/.env.production -f docker-compose.prod.yml up 
 docker compose --env-file backend/.env.production -f docker-compose.prod.yml down
 ```
 
-## 9. Когда появится домен
+Быстрое обновление после изменений в коде:
+
+```bash
+cd /opt/cafe-site
+git pull
+sh ./deploy.prod.sh
+```
+
+Если вы обновляете проект не через `git`, а через `WinSCP`, тогда после загрузки файлов достаточно:
+
+```bash
+cd /opt/cafe-site
+sh ./deploy.prod.sh
+```
+
+## 10. Когда появится домен
 
 После привязки домена обновите `backend/.env.production`:
 
@@ -273,7 +393,7 @@ DJANGO_SECURE_HSTS_PRELOAD=1
 - сначала убедитесь, что HTTPS уже реально работает
 - только потом включайте HSTS
 
-## 10. SSL
+## 11. SSL
 
 Текущий `nginx`-конфиг рассчитан на старт по `HTTP`.
 Для боевого домена следующим шагом нужно:
@@ -290,7 +410,7 @@ DJANGO_SECURE_HSTS_PRELOAD=1
 3. Потом привязать домен и включить `HTTPS`
 4. Только после этого включать `DJANGO_SECURE_SSL_REDIRECT=1` и `HSTS`
 
-## 11. Бэкапы
+## 12. Бэкапы
 
 Минимум для production:
 
@@ -302,10 +422,10 @@ DJANGO_SECURE_HSTS_PRELOAD=1
 
 ```bash
 docker compose --env-file backend/.env.production -f docker-compose.prod.yml exec -T db \
-  pg_dump -U "$DB_USER" "$DB_NAME" > backup_$(date +%F).sql
+  sh -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup_$(date +%F).sql
 ```
 
-## 12. Переезд на другой хостинг позже
+## 13. Переезд на другой хостинг позже
 
 Чтобы переезд прошёл спокойно:
 
@@ -323,7 +443,30 @@ docker compose --env-file backend/.env.production -f docker-compose.prod.yml exe
 
 Сами контейнеры, база и код могут остаться теми же.
 
-## 13. Быстрый чеклист первого запуска
+## 13.1. Автозапуск сайта после перезагрузки сервера
+
+В production compose уже указано:
+
+- `restart: unless-stopped` у `web`
+- `restart: unless-stopped` у `bot`
+- `restart: unless-stopped` у `nginx`
+- `restart: unless-stopped` у `db`
+
+Если на сервере выполнено:
+
+```bash
+systemctl enable docker
+```
+
+то после `reboot` Docker сам поднимет контейнеры снова.
+
+Проверка после перезагрузки:
+
+```bash
+docker compose --env-file backend/.env.production -f docker-compose.prod.yml ps
+```
+
+## 14. Быстрый чеклист первого запуска
 
 Если нужен самый короткий маршрут, то он такой:
 
@@ -361,7 +504,7 @@ docker compose --env-file backend/.env.production -f docker-compose.prod.yml exe
 - `http://SERVER_IP/`
 - `http://SERVER_IP/admin/`
 
-## 14. Что делать, если что-то не запускается
+## 15. Что делать, если что-то не запускается
 
 Почти всегда первым делом полезно посмотреть:
 
