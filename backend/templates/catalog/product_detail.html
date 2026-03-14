@@ -3,21 +3,19 @@
 
 {% block content %}
   <div style="margin-bottom:16px;">
-    <a href="{% url 'catalog:index' %}">← Вернуться в каталог</a>
+    <a href="{% url 'catalog:index' %}" class="back-link">← Вернуться в каталог</a>
   </div>
 
-  <div style="display:grid;grid-template-columns:minmax(320px,480px) 1fr;gap:28px;align-items:start;">
+  <div class="product-detail-layout">
     <div>
       {% with main=product.main_image %}
-        <div
-          style="border:1px solid #ddd;border-radius:16px;overflow:hidden;background:#f3f3f3;"
-        >
+        <div class="product-main-card">
           {% if main %}
             <img
               id="product-main-image"
               src="{{ main.image.url }}"
               alt="{{ main.alt_text|default:product.name }}"
-              style="width:100%;display:block;aspect-ratio:1/1;object-fit:cover;"
+              class="product-main-image"
             />
           {% else %}
             <div
@@ -31,26 +29,13 @@
       {% endwith %}
 
       {% if product.images.all %}
-        <div
-          style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;"
-          id="product-gallery"
-        >
+        <div class="product-gallery" id="product-gallery">
           {% for image in product.images.all %}
             <button
               type="button"
               class="product-thumb-btn {% if product.main_image and product.main_image.id == image.id %}is-active{% endif %}"
               data-image-url="{{ image.image.url }}"
               data-image-alt="{{ image.alt_text|default:product.name }}"
-              style="
-                padding:0;
-                border:1px solid {% if product.main_image and product.main_image.id == image.id %}#111{% else %}#ddd{% endif %};
-                border-radius:10px;
-                overflow:hidden;
-                background:#fff;
-                cursor:pointer;
-                width:76px;
-                height:76px;
-              "
               aria-label="Показать изображение {{ forloop.counter }}"
             >
               <img
@@ -77,16 +62,7 @@
         {% endif %}
       </div>
 
-      <div
-        style="
-          border:1px solid #ddd;
-          border-radius:14px;
-          padding:14px;
-          display:grid;
-          gap:10px;
-          max-width:460px;
-        "
-      >
+      <div class="product-detail-meta">
         <div style="display:flex;justify-content:space-between;gap:12px;">
           <div style="opacity:.7;">Категория</div>
           <div>{{ product.category.name }}</div>
@@ -111,21 +87,14 @@
         </div>
       {% endif %}
 
-      <div
-        style="
-          display:flex;
-          align-items:center;
-          gap:10px;
-          flex-wrap:wrap;
-          margin-top:8px;
-        "
-      >
+      <div class="product-detail-actions">
         <button
           type="button"
           data-cart-action="dec"
+          data-cart-kind="product"
           data-product-id="{{ product.id }}"
           {% if qty|default:0 <= 0 %}disabled{% endif %}
-          style="width:40px;height:40px;"
+          class="btn-icon"
         >
           −
         </button>
@@ -140,13 +109,14 @@
         <button
           type="button"
           data-cart-action="add"
+          data-cart-kind="product"
           data-product-id="{{ product.id }}"
-          style="width:40px;height:40px;"
+          class="btn-icon"
         >
           +
         </button>
 
-        <a href="{% url 'orders:cart' %}" style="margin-left:8px;">
+        <a href="{% url 'orders:cart' %}" class="inline-link" style="margin-left:8px;">
           Открыть корзину
         </a>
       </div>
