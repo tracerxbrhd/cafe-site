@@ -96,7 +96,14 @@
     <div class="order-lines">
       {% for line in lines %}
         <div class="order-line">
-          <div>{{ line.product.name }} × {{ line.qty }}</div>
+          <div>
+            {% if line.kind == "product" and line.product %}
+              {{ line.product.name }}
+            {% elif line.kind == "business_lunch" and line.lunch_day %}
+              {{ line.lunch_day.display_name }}
+            {% endif %}
+            × {{ line.qty }}
+          </div>
           <div>{{ line.line_total }} ₽</div>
         </div>
       {% endfor %}

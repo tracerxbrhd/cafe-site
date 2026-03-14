@@ -16,13 +16,66 @@
     <div><b>Итого:</b> {{ order.total }} ₽</div>
   </div>
 
+  <div class="panel" style="padding:14px;margin:18px 0;background:#fcfcfc;">
+    <div style="font-size:14px;font-weight:700;margin-bottom:8px;">Идентификатор заказа</div>
+    <div class="copy-field-row">
+      <input
+        id="order-public-id"
+        type="text"
+        readonly
+        value="{{ order.public_id }}"
+        class="copy-field-input"
+      />
+      <button type="button" id="copy-order-public-id" class="btn">Скопировать ID</button>
+    </div>
+    <div class="form-hint" style="margin-top:8px;">
+      Этот ID можно использовать на странице «Мои заказы», чтобы быстро найти заказ.
+    </div>
+  </div>
+
   <div class="notice-box" style="margin:18px 0;">
     Сохрани ссылку на страницу статуса заказа. По ней можно отслеживать изменения статуса без входа в аккаунт.
   </div>
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;">
     <a href="{% url 'orders:order_status' public_id=order.public_id %}" class="btn btn-primary">Открыть статус заказа</a>
+    <a href="{% url 'orders:order_lookup' %}" class="btn">Мои заказы</a>
     <a href="{% url 'catalog:index' %}" class="btn-link">Вернуться в каталог</a>
   </div>
 </div>
+
+<script>
+(function() {
+  const button = document.getElementById("copy-order-public-id");
+  const input = document.getElementById("order-public-id");
+  if (!button || !input) return;
+
+  async function copyPublicId() {
+    const value = input.value;
+    if (!value) return;
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        input.focus();
+        input.select();
+        document.execCommand("copy");
+      }
+      button.textContent = "Скопировано";
+      setTimeout(() => {
+        button.textContent = "Скопировать ID";
+      }, 1600);
+    } catch (err) {
+      console.error("copy order id error:", err);
+      button.textContent = "Не удалось";
+      setTimeout(() => {
+        button.textContent = "Скопировать ID";
+      }, 1600);
+    }
+  }
+
+  button.addEventListener("click", copyPublicId);
+})();
+</script>
 {% endblock %}

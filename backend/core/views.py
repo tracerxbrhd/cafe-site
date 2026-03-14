@@ -1,10 +1,14 @@
 from django.shortcuts import render
 from .models import BusinessLunchWeek, BusinessLunchDay, ServicePage
 from .utils import get_current_business_lunch_day, get_service_page
+from orders.cart import lunch_get_qty
 
 
 def business_lunches_page(request):
     current_day = get_current_business_lunch_day()
+
+    if current_day:
+        current_day.cart_qty = lunch_get_qty(request.session, current_day.id)
 
     weeks = (
         BusinessLunchWeek.objects.filter(
@@ -14,6 +18,10 @@ def business_lunches_page(request):
         .prefetch_related("days__items__product")
         .order_by("-week_start")
     )
+
+    for week in weeks:
+        for day in week.days.all():
+            day.cart_qty = lunch_get_qty(request.session, day.id)
 
     return render(
         request,

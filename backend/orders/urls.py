@@ -5,6 +5,7 @@ app_name = "orders"
 
 urlpatterns = [
     path("", views.cart_page, name="cart"),
+    path("my-orders/", views.order_lookup_page, name="order_lookup"),
     path("checkout/", views.checkout_page, name="checkout"),
 
     path("success/<uuid:public_id>/", views.order_success_page, name="order_success"),

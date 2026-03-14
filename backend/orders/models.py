@@ -1,4 +1,5 @@
 from django.db import models
+from core.models import BusinessLunchDay
 from catalog.models import Product
 import uuid
 
@@ -107,7 +108,19 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items", verbose_name="Заказ")
-    product = models.ForeignKey(Product, on_delete=models.PROTECT, verbose_name="Блюдо")
+    # product = models.ForeignKey(Product, on_delete=models.PROTECT, verbose_name="Блюдо")
+    product = models.ForeignKey(
+    Product,
+    on_delete=models.PROTECT,
+    null=True,
+    blank=True,
+    )
+    lunch_day = models.ForeignKey(
+    BusinessLunchDay,
+    on_delete=models.PROTECT,
+    null=True,
+    blank=True,
+    )
 
     product_name = models.CharField("Название на момент заказа", max_length=160)
     unit_price = models.DecimalField("Цена за единицу", max_digits=10, decimal_places=2)

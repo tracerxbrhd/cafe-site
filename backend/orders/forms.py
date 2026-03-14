@@ -1,6 +1,26 @@
 import re
+import uuid
 from django import forms
 from .models import Order
+
+
+def normalize_phone_number(raw: str) -> str:
+    raw = (raw or "").strip()
+    digits = re.sub(r"\D", "", raw)
+
+    if not digits:
+        raise forms.ValidationError("Укажите телефон.")
+
+    if digits.startswith("8") and len(digits) == 11:
+        digits = "7" + digits[1:]
+
+    if len(digits) == 10:
+        digits = "7" + digits
+
+    if len(digits) != 11 or not digits.startswith("7"):
+        raise forms.ValidationError("Укажите корректный номер телефона.")
+
+    return f"+{digits}"
 
 
 class CheckoutForm(forms.Form):
@@ -41,22 +61,7 @@ class CheckoutForm(forms.Form):
         return value
 
     def clean_customer_phone(self):
-        raw = (self.cleaned_data.get("customer_phone") or "").strip()
-        digits = re.sub(r"\D", "", raw)
-
-        if not digits:
-            raise forms.ValidationError("Укажите телефон.")
-
-        if digits.startswith("8") and len(digits) == 11:
-            digits = "7" + digits[1:]
-
-        if len(digits) == 10:
-            digits = "7" + digits
-
-        if len(digits) != 11 or not digits.startswith("7"):
-            raise forms.ValidationError("Укажите корректный номер телефона.")
-
-        return f"+{digits}"
+        return normalize_phone_number(self.cleaned_data.get("customer_phone"))
 
     def clean(self):
         cleaned = super().clean()
@@ -80,3 +85,39 @@ class CheckoutForm(forms.Form):
             cleaned["delivery_lon"] = ""
 
         return cleaned
+
+
+class OrderLookupPhoneForm(forms.Form):
+    phone = forms.CharField(
+        max_length=32,
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "+7 (___) ___-__-__",
+                "inputmode": "tel",
+                "autocomplete": "tel",
+            }
+        ),
+    )
+
+    def clean_phone(self):
+        return normalize_phone_number(self.cleaned_data.get("phone"))
+
+
+class OrderLookupPublicIdForm(forms.Form):
+    public_id = forms.CharField(
+        max_length=64,
+        widget=forms.TextInput(
+            attrs={
+                "placeholder": "Например: 4e68f0e9-....",
+                "autocomplete": "off",
+            }
+        ),
+    )
+
+    def clean_public_id(self):
+        raw = (self.cleaned_data.get("public_id") or "").strip()
+
+        try:
+            return uuid.UUID(raw)
+        except (ValueError, TypeError, AttributeError):
+            raise forms.ValidationError("Укажите корректный идентификатор заказа.")

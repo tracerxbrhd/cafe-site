@@ -27,7 +27,7 @@
               disabled
             >−</button>
 
-            <span data-qty="lunch-{{ current_day.id }}" class="qty-value">0</span>
+            <span data-qty="lunch-{{ current_day.id }}" class="qty-value">{{ current_day.cart_qty|default:0 }}</span>
 
             <button
               type="button"
@@ -103,7 +103,7 @@
                     {% endfor %}
                   </div>
 
-                  <div style="margin-top:14px;">
+                  <div style="margin-top:14px;" hidden>
                     <div class="qty-controls">
                       <button
                         type="button"
@@ -111,10 +111,10 @@
                         data-cart-kind="business_lunch"
                         data-lunch-day-id="{{ day.id }}"
                         class="btn-icon"
-                        disabled
+                        disabled={% if day.service_date < current_date %}true{% endif %}
                       >−</button>
 
-                      <span data-qty="lunch-{{ day.id }}" class="qty-value">0</span>
+                      <span data-qty="lunch-{{ day.id }}" class="qty-value">{{ day.cart_qty|default:0 }}</span>
 
                       <button
                         type="button"
@@ -122,6 +122,7 @@
                         data-cart-kind="business_lunch"
                         data-lunch-day-id="{{ day.id }}"
                         class="btn-icon"
+                        disabled={% if day.service_date < current_date %}true{% endif %}
                       >+</button>
                     </div>
                   </div>

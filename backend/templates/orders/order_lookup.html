@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}Мои заказы — Сказка{% endblock %}
+
+{% block content %}
+<h1 class="section-title">Мои заказы</h1>
+
+<div class="order-lookup-search">
+  <form method="get" class="panel">
+    <input type="hidden" name="lookup" value="public_id" />
+    <h2 class="panel-title">Найти по идентификатору</h2>
+    <div class="form-grid">
+      <div class="form-row">
+        <label class="form-label" for="{{ public_id_form.public_id.id_for_label }}">Идентификатор заказа</label>
+        {{ public_id_form.public_id }}
+        <div class="form-hint">Укажите UUID заказа со страницы подтверждения.</div>
+        {% if public_id_form.public_id.errors %}
+          <div class="form-error">{{ public_id_form.public_id.errors }}</div>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="btn btn-primary">Найти заказ</button>
+    </div>
+  </form>
+
+  <form method="get" class="panel">
+    <input type="hidden" name="lookup" value="phone" />
+    <h2 class="panel-title">Найти по номеру телефона</h2>
+    <div class="form-grid">
+      <div class="form-row">
+        <label class="form-label" for="{{ phone_form.phone.id_for_label }}">Телефон</label>
+        {{ phone_form.phone }}
+        <div class="form-hint">Введите тот номер, который был указан при оформлении заказа.</div>
+        {% if phone_form.phone.errors %}
+          <div class="form-error">{{ phone_form.phone.errors }}</div>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="btn btn-primary">Показать мои заказы</button>
+    </div>
+  </form>
+</div>
+
+<div style="display:grid;gap:20px;margin-top:20px;">
+  {% if lookup_mode == "public_id" %}
+    {% if public_id_lookup_done and not public_id_form.errors %}
+      {% if public_id_order %}
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+            <div>
+              <div style="font-size:22px;font-weight:700;">Заказ #{{ public_id_order.id }}</div>
+              <div class="muted">Создан: {{ public_id_order.created_at|date:"d.m.Y H:i" }}</div>
+            </div>
+            <div class="status-badge">{{ public_id_order.get_status_display }}</div>
+          </div>
+
+          <div class="lookup-result-list" style="margin-top:14px;">
+            <div><b>Идентификатор:</b> <code>{{ public_id_order.public_id }}</code></div>
+            <div><b>Телефон:</b> {{ public_id_order.customer_phone }}</div>
+            <div><b>Способ получения:</b> {{ public_id_order.get_fulfillment_display }}</div>
+            <div><b>Итого:</b> {{ public_id_order.total }} ₽</div>
+          </div>
+
+          {% if public_id_order.items.all %}
+            <div style="display:grid;gap:6px;margin-top:16px;">
+              {% for item in public_id_order.items.all %}
+                <div class="muted">{{ item.product_name }} × {{ item.quantity }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+            <a href="{% url 'orders:order_status' public_id=public_id_order.public_id %}" class="btn btn-primary">Открыть статус заказа</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="notice-box">
+          Заказ с таким идентификатором не найден. Проверьте ID и попробуйте ещё раз.
+        </div>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+
+  {% if lookup_mode == "phone" %}
+    {% if phone_lookup_done and not phone_form.errors %}
+      <div class="panel">
+        <div style="font-size:20px;font-weight:700;">Заказы по номеру {{ searched_phone }}</div>
+        <div class="muted" style="margin-top:6px;">
+          Найдено: {{ phone_orders|length }}
+        </div>
+      </div>
+
+      {% if active_phone_orders %}
+        <div>
+          <h2 class="panel-title" style="margin-bottom:12px;">Актуальные заказы</h2>
+          <div style="display:grid;gap:12px;">
+            {% for order in active_phone_orders %}
+              <div class="panel">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                  <div>
+                    <div style="font-size:20px;font-weight:700;">Заказ #{{ order.id }}</div>
+                    <div class="muted">{{ order.created_at|date:"d.m.Y H:i" }}</div>
+                  </div>
+                  <div class="status-badge">{{ order.get_status_display }}</div>
+                </div>
+
+                <div class="lookup-result-list" style="margin-top:14px;">
+                  <div><b>Идентификатор:</b> <code>{{ order.public_id }}</code></div>
+                  <div><b>Способ получения:</b> {{ order.get_fulfillment_display }}</div>
+                  <div><b>Итого:</b> {{ order.total }} ₽</div>
+                </div>
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+                  <a href="{% url 'orders:order_status' public_id=order.public_id %}" class="btn btn-primary">Открыть статус</a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if completed_phone_orders %}
+        <div>
+          <h2 class="panel-title" style="margin-bottom:12px;">Завершённые и закрытые заказы</h2>
+          <div style="display:grid;gap:12px;">
+            {% for order in completed_phone_orders %}
+              <div class="panel">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                  <div>
+                    <div style="font-size:20px;font-weight:700;">Заказ #{{ order.id }}</div>
+                    <div class="muted">{{ order.created_at|date:"d.m.Y H:i" }}</div>
+                  </div>
+                  <div class="status-badge">{{ order.get_status_display }}</div>
+                </div>
+
+                <div class="lookup-result-list" style="margin-top:14px;">
+                  <div><b>Идентификатор:</b> <code>{{ order.public_id }}</code></div>
+                  <div><b>Способ получения:</b> {{ order.get_fulfillment_display }}</div>
+                  <div><b>Итого:</b> {{ order.total }} ₽</div>
+                </div>
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+                  <a href="{% url 'orders:order_status' public_id=order.public_id %}" class="btn-link">Открыть детали</a>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if not phone_orders %}
+        <div class="notice-box">
+          По этому номеру заказов пока не найдено.
+        </div>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+
+  {% if not lookup_mode %}
+    <div class="notice-box">
+      Здесь можно найти заказ по идентификатору или посмотреть все свои заказы по номеру телефона.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

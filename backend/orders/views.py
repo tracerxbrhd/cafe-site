@@ -48,7 +48,7 @@ from .cart import (
     cart_set,
     lunch_get_qty,
 )
-from .forms import CheckoutForm
+from .forms import CheckoutForm, OrderLookupPhoneForm, OrderLookupPublicIdForm
 from .models import Order, OrderItem
 from .notifications import build_order_status_keyboard, format_new_order_message
 
@@ -58,6 +58,66 @@ from .notifications import build_order_status_keyboard, format_new_order_message
 def cart_page(request):
     lines, total = cart_lines(request.session)
     return render(request, "orders/cart.html", {"lines": lines, "total": total})
+
+
+def order_lookup_page(request):
+    phone_form = OrderLookupPhoneForm()
+    public_id_form = OrderLookupPublicIdForm()
+
+    lookup_mode = (request.GET.get("lookup") or "").strip()
+    if not lookup_mode:
+        if (request.GET.get("public_id") or "").strip():
+            lookup_mode = "public_id"
+        elif (request.GET.get("phone") or "").strip():
+            lookup_mode = "phone"
+
+    public_id_order = None
+    phone_orders = []
+    active_phone_orders = []
+    completed_phone_orders = []
+    searched_phone = ""
+    public_id_lookup_done = False
+    phone_lookup_done = False
+
+    if lookup_mode == "public_id":
+        public_id_lookup_done = True
+        public_id_form = OrderLookupPublicIdForm(request.GET)
+        if public_id_form.is_valid():
+            public_id_order = (
+                Order.objects.filter(public_id=public_id_form.cleaned_data["public_id"])
+                .prefetch_related("items")
+                .first()
+            )
+    elif lookup_mode == "phone":
+        phone_lookup_done = True
+        phone_form = OrderLookupPhoneForm(request.GET)
+        if phone_form.is_valid():
+            searched_phone = phone_form.cleaned_data["phone"]
+            phone_orders = list(
+                Order.objects.filter(customer_phone=searched_phone)
+                .order_by("-created_at")
+                .prefetch_related("items")
+            )
+            terminal_statuses = {Order.Status.DONE, Order.Status.CANCELED}
+            active_phone_orders = [o for o in phone_orders if o.status not in terminal_statuses]
+            completed_phone_orders = [o for o in phone_orders if o.status in terminal_statuses]
+
+    return render(
+        request,
+        "orders/order_lookup.html",
+        {
+            "lookup_mode": lookup_mode,
+            "phone_form": phone_form,
+            "public_id_form": public_id_form,
+            "public_id_order": public_id_order,
+            "public_id_lookup_done": public_id_lookup_done,
+            "searched_phone": searched_phone,
+            "phone_orders": phone_orders,
+            "active_phone_orders": active_phone_orders,
+            "completed_phone_orders": completed_phone_orders,
+            "phone_lookup_done": phone_lookup_done,
+        },
+    )
 
 
 # def cart_api_summary(request):
@@ -122,8 +182,14 @@ def cart_api_set(request):
     product_id = int(request.POST.get("product_id", "0"))
     qty = int(request.POST.get("qty", "0"))
     cart_set(request.session, product_id=product_id, qty=qty)
-    # return JsonResponse({"ok": True, "count": cart_count(request.session)})
-    return JsonResponse({"ok": True, "count": cart_count(...), "product_id": product_id, "qty": cart_get_qty(..., product_id)})
+    return JsonResponse(
+        {
+            "ok": True,
+            "count": cart_count(request.session),
+            "product_id": product_id,
+            "qty": cart_get_qty(request.session, product_id),
+        }
+    )
 
 
 @require_POST
@@ -498,9 +564,35 @@ def checkout_page(request):
             #         line_total=line.line_total,
             #     )
             #     order_total += item.line_total
+            # for line in lines:
+            #     if line.kind == "product" and line.product:
+            #         item = OrderItem.objects.create(
+            #             order=order,
+            #             product=line.product,
+            #             product_name=line.product.name,
+            #             unit_price=line.unit_price,
+            #             quantity=line.qty,
+            #             line_total=line.line_total,
+            #         )
+            #     elif line.kind == "business_lunch" and line.lunch_day:
+            #         composition_parts = []
+            #         for comp in line.lunch_day.items.all():
+            #             if comp.role:
+            #                 composition_parts.append(f"{comp.role}: {comp.product.name}")
+            #             else:
+            #                 composition_parts.append(comp.product.name)
+
+            #         item = OrderItem.objects.create(
+            #             order=order,
+            #             product=None,
+            #             product_name=line.lunch_day.display_name,
+            #             unit_price=line.unit_price,
+            #             quantity=line.qty,
+            #             line_total=line.line_total,
+            #         )
             for line in lines:
                 if line.kind == "product" and line.product:
-                    item = OrderItem.objects.create(
+                    OrderItem.objects.create(
                         order=order,
                         product=line.product,
                         product_name=line.product.name,
@@ -508,17 +600,11 @@ def checkout_page(request):
                         quantity=line.qty,
                         line_total=line.line_total,
                     )
-                elif line.kind == "business_lunch" and line.lunch_day:
-                    composition_parts = []
-                    for comp in line.lunch_day.items.all():
-                        if comp.role:
-                            composition_parts.append(f"{comp.role}: {comp.product.name}")
-                        else:
-                            composition_parts.append(comp.product.name)
 
-                    item = OrderItem.objects.create(
+                elif line.kind == "business_lunch" and line.lunch_day:
+                    OrderItem.objects.create(
                         order=order,
-                        product=None,
+                        lunch_day=line.lunch_day,
                         product_name=line.lunch_day.display_name,
                         unit_price=line.unit_price,
                         quantity=line.qty,
@@ -527,7 +613,7 @@ def checkout_page(request):
                 else:
                     continue
 
-                order_total += item.line_total
+                order_total += line.line_total
 
             order_total += delivery_fee
             order.total = order_total.quantize(Decimal("0.01"))

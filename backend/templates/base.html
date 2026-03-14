@@ -19,6 +19,10 @@
       font-family: Arial, sans-serif;
       color: #111;
       background: #fafafa;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
     }
 
     a {
@@ -116,7 +120,7 @@
       flex-wrap: wrap;
     }
 
-    .header-cart-link {
+    .header-action-link {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -129,8 +133,13 @@
       font-weight: 700;
     }
 
-    .header-cart-link:hover {
+    .header-action-link:hover {
       background: #f5f5f5;
+    }
+
+    .header-cart-total {
+      margin-left: 6px;
+      white-space: nowrap;
     }
 
     .hero-full {
@@ -554,6 +563,31 @@
       background: #fcfcfc;
     }
 
+    .lookup-result-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .order-lookup-search {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .copy-field-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .copy-field-input {
+      flex: 1 1 320px;
+      min-width: 0;
+      font-family: Consolas, monospace;
+      background: #fff;
+    }
+
     .teaser-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -574,7 +608,7 @@
     .site-footer {
       background: #111;
       color: #fff;
-      margin-top: 48px;
+      margin-top: auto;
     }
 
     .site-footer-inner {
@@ -607,6 +641,7 @@
     @media (max-width: 900px) {
       .cart-layout,
       .page-grid,
+      .order-lookup-search,
       .teaser-grid,
       .site-footer-inner {
         grid-template-columns: 1fr;
@@ -714,8 +749,9 @@
         </nav>
 
         <div class="header-actions">
-          <a href="{% url 'orders:cart' %}" class="header-cart-link">
-            Корзина: <span id="cart-count" style="margin-left:6px;">{{ cart_count }}</span>
+          <a href="{% url 'orders:order_lookup' %}" class="header-action-link">Мои заказы</a>
+          <a href="{% url 'orders:cart' %}" class="header-action-link">
+            Корзина: <span id="cart-header-total" class="header-cart-total">{{ cart_total }}</span> ₽
           </a>
         </div>
       </div>
@@ -745,7 +781,7 @@
 
   {% block hero_full %}{% endblock %}
 
-  <main>
+  <main style="flex:1 0 auto;width:100%;">
     <div class="container">
       {% if messages %}
         <div style="display:grid;gap:10px;margin-bottom:16px;">
@@ -815,6 +851,7 @@
             <a href="{% url 'core:business_lunches' %}">Бизнес-ланчи</a>
             <a href="{% url 'core:banquets' %}">Банкеты</a>
             <a href="{% url 'core:catering' %}">Кейтеринг</a>
+            <a href="{% url 'orders:order_lookup' %}">Мои заказы</a>
           </div>
         </div>
 
@@ -885,9 +922,9 @@ async function postForm(url, data) {
   return await resp.json();
 }
 
-function setCartCount(count) {
-  const el = document.getElementById("cart-count");
-  if (el) el.textContent = String(count);
+function setCartHeaderTotal(total) {
+  const el = document.getElementById("cart-header-total");
+  if (el) el.textContent = String(total);
 }
 
 function setProductQty(productId, qty) {
@@ -951,7 +988,6 @@ function showToast(message, kind = "success") {
 
 async function refreshCartPage() {
   const totalEl = document.getElementById("cart-total");
-  if (!totalEl) return;
 
   const resp = await fetch("{% url 'orders:api_summary' %}", {
     credentials: "same-origin",
@@ -961,7 +997,8 @@ async function refreshCartPage() {
 
   const data = await resp.json();
 
-  setCartCount(data.count);
+  setCartHeaderTotal(data.total);
+  if (!totalEl) return data;
   totalEl.textContent = data.total;
 
   for (const item of data.items) {
@@ -1111,9 +1148,9 @@ async function postForm(url, data) {
   return await resp.json();
 }
 
-function setCartCount(count) {
-  const el = document.getElementById("cart-count");
-  if (el) el.textContent = String(count);
+function setCartHeaderTotal(total) {
+  const el = document.getElementById("cart-header-total");
+  if (el) el.textContent = String(total);
 }
 
 function keyFor(kind, id) {
@@ -1230,7 +1267,6 @@ function showToast(message, kind = "success") {
 } {% endcomment %}
 async function refreshCartPage() {
   const totalEl = document.getElementById("cart-total");
-  if (!totalEl) return;
 
   const resp = await fetch("{% url 'orders:api_summary' %}", {
     credentials: "same-origin",
@@ -1240,7 +1276,8 @@ async function refreshCartPage() {
 
   const data = await resp.json();
 
-  setCartCount(data.count);
+  setCartHeaderTotal(data.total);
+  if (!totalEl) return data;
   totalEl.textContent = data.total;
 
   const presentKeys = new Set();
@@ -1341,15 +1378,13 @@ async function handleCartAction(action, kind, id) {
 
     if (action === "clear") {
       response = await postForm("{% url 'orders:api_clear' %}", {});
-      setCartCount(response.count);
+      setCartHeaderTotal("0.00");
       showToast("Корзина очищена");
       location.reload();
       return;
     }
 
     if (!response) return;
-
-    setCartCount(response.count);
 
     if (kind === "product" && response.product_id != null && response.qty != null) {
       setItemQty("product", response.product_id, response.qty);
