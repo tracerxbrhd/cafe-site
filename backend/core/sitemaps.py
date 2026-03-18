@@ -18,6 +18,7 @@ class StaticViewSitemap(Sitemap):
             "core:business_lunches",
             "core:banquets",
             "core:catering",
+            "core:children_parties",
         ]
 
     def location(self, item):
@@ -41,6 +42,7 @@ class StaticViewSitemap(Sitemap):
         page_type = {
             "core:banquets": ServicePage.PageType.BANQUETS,
             "core:catering": ServicePage.PageType.CATERING,
+            "core:children_parties": ServicePage.PageType.CHILDREN_PARTIES,
         }.get(item)
         if page_type:
             return (

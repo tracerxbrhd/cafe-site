@@ -1,10 +1,11 @@
-from datetime import date, time
+from datetime import date, datetime, time
 from decimal import Decimal
 import os
 from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from core.models import BusinessLunchDay, BusinessLunchWeek, CafeSettings
 from promotions.models import PromoCode
@@ -21,6 +22,8 @@ class CheckoutBusinessLunchTests(TestCase):
             is_open=True,
             opening_time=time(0, 0),
             closing_time=time(0, 0),
+            order_opening_time=time(0, 0),
+            order_closing_time=time(0, 0),
             min_order_amount=Decimal("0.00"),
         )
         week = BusinessLunchWeek.objects.create(
@@ -88,6 +91,8 @@ class OrderLookupTests(TestCase):
             is_open=True,
             opening_time=time(0, 0),
             closing_time=time(0, 0),
+            order_opening_time=time(0, 0),
+            order_closing_time=time(0, 0),
             min_order_amount=Decimal("0.00"),
         )
         self.phone = "+79001234567"
@@ -161,6 +166,8 @@ class CheckoutPromoCodeTests(TestCase):
             is_open=True,
             opening_time=time(0, 0),
             closing_time=time(0, 0),
+            order_opening_time=time(0, 0),
+            order_closing_time=time(0, 0),
             min_order_amount=Decimal("0.00"),
         )
         week = BusinessLunchWeek.objects.create(
@@ -410,3 +417,49 @@ class TelegramOrderStatusTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         process_update_mock.assert_called_once()
+
+
+class OrderAcceptanceWindowTests(TestCase):
+    def setUp(self):
+        CafeSettings.objects.create(
+            is_open=True,
+            working_hours_text="Ежедневно, 10:00–21:00",
+            opening_time=time(10, 0),
+            closing_time=time(21, 0),
+            order_hours_text="Ежедневно, 10:00–20:00",
+            order_opening_time=time(10, 0),
+            order_closing_time=time(20, 0),
+            min_order_amount=Decimal("0.00"),
+        )
+        week = BusinessLunchWeek.objects.create(
+            title="Часы приёма заказов",
+            slug="hours-week",
+            week_start=date(2026, 3, 16),
+            week_end=date(2026, 3, 22),
+            is_active=True,
+            is_published=True,
+        )
+        self.lunch_day = BusinessLunchDay.objects.create(
+            week=week,
+            service_date=date(2026, 3, 18),
+            title="Среда",
+            price=Decimal("390.00"),
+            is_active=True,
+        )
+
+        session = self.client.session
+        session[LUNCH_CART_SESSION_KEY] = {str(self.lunch_day.id): 1}
+        session.save()
+
+    @patch("core.models.timezone.localtime")
+    def test_checkout_redirects_when_order_acceptance_is_closed(self, localtime_mock):
+        localtime_mock.return_value = timezone.make_aware(
+            datetime(2026, 3, 18, 20, 30),
+            timezone.get_current_timezone(),
+        )
+
+        response = self.client.get(reverse("orders:checkout"), follow=True)
+
+        self.assertRedirects(response, reverse("orders:cart"))
+        self.assertContains(response, "Сейчас приём заказов недоступен.")
+        self.assertContains(response, "Ежедневно, 10:00–20:00")

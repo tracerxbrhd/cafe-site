@@ -92,6 +92,27 @@
     <span id="dash-live-status" style="font-size:16px;font-weight:700;">включено</span>
   </div>
 
+  <div style="padding:14px 18px;background:#f7f0ff;border-radius:10px;min-width:240px;">
+    <b>Звук</b><br>
+    <span id="dash-sound-status" style="font-size:16px;font-weight:700;">ожидает активации</span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <button
+        type="button"
+        id="dash-sound-test"
+        style="border:none;border-radius:8px;background:#fff;padding:8px 12px;cursor:pointer;font-weight:700;"
+      >
+        Проверить
+      </button>
+      <button
+        type="button"
+        id="dash-sound-toggle"
+        style="border:none;border-radius:8px;background:#111;color:#fff;padding:8px 12px;cursor:pointer;font-weight:700;"
+      >
+        Выключить
+      </button>
+    </div>
+  </div>
+
   <div style="padding:14px 18px;background:#f1f3f4;border-radius:10px;">
     <b>Режим списка</b><br>
     <span style="font-size:16px;font-weight:700;">по умолчанию: активные</span>
@@ -134,12 +155,46 @@
   let audioUnlocked = false;
 
   const liveStatus = document.getElementById("dash-live-status");
+  const soundStatus = document.getElementById("dash-sound-status");
+  const soundTestBtn = document.getElementById("dash-sound-test");
+  const soundToggleBtn = document.getElementById("dash-sound-toggle");
   const dashNew = document.getElementById("dash-new");
   const dashActive = document.getElementById("dash-active");
   const dashDone = document.getElementById("dash-done");
   const dashRevenue = document.getElementById("dash-revenue");
 
   let audioContext = null;
+  let soundMuted = false;
+
+  try {
+    soundMuted = window.localStorage.getItem("admin-order-sound-muted") === "1";
+  } catch (e) {
+    soundMuted = false;
+  }
+
+  function persistSoundMutedState() {
+    try {
+      window.localStorage.setItem("admin-order-sound-muted", soundMuted ? "1" : "0");
+    } catch (e) {
+      console.error("sound state persist failed:", e);
+    }
+  }
+
+  function updateSoundStatus() {
+    if (soundStatus) {
+      if (soundMuted) {
+        soundStatus.textContent = "выключен";
+      } else if (audioUnlocked) {
+        soundStatus.textContent = "включен";
+      } else {
+        soundStatus.textContent = "ожидает активации";
+      }
+    }
+
+    if (soundToggleBtn) {
+      soundToggleBtn.textContent = soundMuted ? "Включить" : "Выключить";
+    }
+  }
 
   function ensureAudioContext() {
     if (!audioContext) {
@@ -163,6 +218,7 @@
     }
 
     audioUnlocked = ctx.state === "running";
+    updateSoundStatus();
   }
 
   function beep(duration = 0.12, frequency = 880, volume = 100.00, delay = 0) {
@@ -189,6 +245,7 @@
   }
 
   function playNewOrderSound() {
+    if (soundMuted) return;
     beep(0.10, 880, 0.035, 0);
     beep(0.10, 988, 0.035, 0.16);
     beep(0.14, 1174, 0.04, 0.32);
@@ -249,6 +306,7 @@
       }
 
       if (liveStatus) liveStatus.textContent = audioUnlocked ? "включено" : "включено (звук ждёт активации)";
+      updateSoundStatus();
     } catch (err) {
       console.error("admin live poll error:", err);
       if (liveStatus) liveStatus.textContent = "ошибка";
@@ -262,12 +320,33 @@
     window.addEventListener(eventName, unlockAudio, { passive: true });
   });
 
+  if (soundTestBtn) {
+    soundTestBtn.addEventListener("click", async function() {
+      await unlockAudio();
+      playNewOrderSound();
+      updateSoundStatus();
+    });
+  }
+
+  if (soundToggleBtn) {
+    soundToggleBtn.addEventListener("click", async function() {
+      soundMuted = !soundMuted;
+      persistSoundMutedState();
+      updateSoundStatus();
+      if (!soundMuted) {
+        await unlockAudio();
+        playNewOrderSound();
+      }
+    });
+  }
+
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) {
       poll();
     }
   });
 
+  updateSoundStatus();
   setInterval(() => {
     if (!document.hidden) {
       poll();

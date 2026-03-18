@@ -34,7 +34,11 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST, require_http_methods
 
 from core.models import BusinessLunchDay
-from core.utils import get_cafe_settings, get_delivery_quote
+from core.utils import (
+    get_active_delivery_zones_map_data,
+    get_cafe_settings,
+    get_delivery_quote,
+)
 from promotions.services import PromoCodeError, apply_promo_code
 
 from .cart import (
@@ -629,10 +633,10 @@ def checkout_page(request):
 
     cafe_settings = get_cafe_settings()
 
-    if cafe_settings and not cafe_settings.is_currently_open():
+    if cafe_settings and not cafe_settings.is_accepting_orders_now():
         messages.error(
             request,
-            f"Сейчас приём заказов недоступен. Режим работы: {cafe_settings.working_hours_text}."
+            f"Сейчас приём заказов недоступен. Приём заказов: {cafe_settings.order_hours_display}."
         )
         return redirect("orders:cart")
 
@@ -834,6 +838,7 @@ def checkout_page(request):
             "delivery_fee": delivery_fee,
             "grand_total": grand_total,
             "online_payment_enabled": is_yookassa_configured(),
+            "delivery_zones_map": get_active_delivery_zones_map_data(),
         },
     )
 

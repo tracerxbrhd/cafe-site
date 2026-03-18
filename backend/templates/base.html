@@ -1379,13 +1379,24 @@
       <div class="site-topbar-inner">
         <div>
           Кафе «Сказка»
-          {% if cafe_is_open_now %}
-            <span style="margin-left:8px;color:#7CFF9B;">● Открыто</span>
+          {% if cafe_is_accepting_orders_now %}
+            <span style="margin-left:8px;color:#7CFF9B;">● Заказы принимаются</span>
+          {% elif cafe_is_open_now %}
+            <span style="margin-left:8px;color:#FFD27A;">● Кафе открыто, приём заказов закрыт</span>
           {% else %}
-            <span style="margin-left:8px;color:#FF9B9B;">● Закрыто</span>
+            <span style="margin-left:8px;color:#FF9B9B;">● Кафе закрыто</span>
           {% endif %}
         </div>
-        <div>Телефон: +7 (000) 000-00-00</div>
+        <div>
+          {% if cafe_settings and cafe_settings.phone %}
+            {{ cafe_settings.phone }}
+          {% else %}
+            +7 (000) 000-00-00
+          {% endif %}
+          {% if cafe_settings and cafe_settings.order_hours_display %}
+            <span style="margin-left:14px;opacity:.82;">Приём заказов: {{ cafe_settings.order_hours_display }}</span>
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>
@@ -1411,6 +1422,7 @@
           <a href="{% url 'core:business_lunches' %}">Бизнес-ланчи</a>
           <a href="{% url 'core:banquets' %}">Банкеты</a>
           <a href="{% url 'core:catering' %}">Кейтеринг</a>
+          <a href="{% url 'core:children_parties' %}">Праздники</a>
         </nav>
 
         <div class="header-actions">
@@ -1437,12 +1449,15 @@
     </div>
   {% endif %}
 
-  {% if cafe_settings and not cafe_is_open_now %}
+  {% if cafe_settings and not cafe_is_accepting_orders_now %}
     <div class="site-alert site-alert--danger">
       <div class="container">
         <div class="site-alert-inner">
-          Сейчас кафе закрыто. Заказы принимаются в часы работы:
-          {{ cafe_settings.working_hours_text|default:"по расписанию" }}.
+          Сейчас приём заказов недоступен.
+          Заказы принимаются: {{ cafe_settings.order_hours_display|default:"по расписанию" }}.
+          {% if cafe_settings.working_hours_text %}
+            Кафе работает: {{ cafe_settings.working_hours_text }}.
+          {% endif %}
         </div>
       </div>
     </div>
@@ -1498,6 +1513,14 @@
                 будет настроен позже
               {% endif %}
             </div>
+            <div>
+              Приём заказов:
+              {% if cafe_settings and cafe_settings.order_hours_display %}
+                {{ cafe_settings.order_hours_display }}
+              {% else %}
+                будет настроен позже
+              {% endif %}
+            </div>
           </div>
         </div>
 
@@ -1508,6 +1531,7 @@
             <a href="{% url 'core:business_lunches' %}">Бизнес-ланчи</a>
             <a href="{% url 'core:banquets' %}">Банкеты</a>
             <a href="{% url 'core:catering' %}">Кейтеринг</a>
+            <a href="{% url 'core:children_parties' %}">Детские праздники</a>
             <a href="{% url 'orders:order_lookup' %}">Мои заказы</a>
           </div>
         </div>
@@ -1523,8 +1547,30 @@
                 +7 (000) 000-00-00
               {% endif %}
             </div>
-            <div>Адрес: г. Ижевск, улица Графа Шувалова, 4Б</div>
-            <div>Режим работы: пн-вс 10:00-23:00</div>
+            <div>
+              Адрес:
+              {% if cafe_settings and cafe_settings.address_text %}
+                {{ cafe_settings.address_text }}
+              {% else %}
+                г. Ижевск, улица Графа Шувалова, 4Б
+              {% endif %}
+            </div>
+            <div>
+              Режим работы:
+              {% if cafe_settings and cafe_settings.working_hours_text %}
+                {{ cafe_settings.working_hours_text }}
+              {% else %}
+                пн-вс 10:00-21:00
+              {% endif %}
+            </div>
+            <div>
+              Приём заказов:
+              {% if cafe_settings and cafe_settings.order_hours_display %}
+                {{ cafe_settings.order_hours_display }}
+              {% else %}
+                пн-вс 10:00-20:00
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>

@@ -121,6 +121,28 @@ def get_delivery_quote(lat: float, lon: float, fulfillment: str) -> DeliveryQuot
     )
 
 
+def get_active_delivery_zones_map_data() -> list[dict]:
+    zones_payload = []
+    zones = DeliveryZone.objects.filter(is_active=True).order_by("sort_order", "name")
+    for zone in zones:
+        try:
+            polygon = _parse_polygon_json(zone.polygon_json)
+        except Exception:
+            continue
+
+        zones_payload.append(
+            {
+                "code": zone.code,
+                "name": zone.name,
+                "delivery_fee": str(zone.delivery_fee),
+                "min_order_amount": str(zone.min_order_amount),
+                "coordinates": [[lat, lon] for lon, lat in polygon],
+            }
+        )
+
+    return zones_payload
+
+
 # def get_current_business_lunch_menu():
 #     today = timezone.localdate()
 

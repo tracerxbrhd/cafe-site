@@ -4,6 +4,13 @@ from catalog.models import Category, Product
 
 
 class SeoInfrastructureTests(TestCase):
+    def test_home_page_renders_service_links(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Бизнес-ланчи")
+        self.assertContains(response, "Детские праздники")
+
     @override_settings(SITE_URL="https://example.com")
     def test_robots_txt_contains_sitemap(self):
         response = self.client.get("/robots.txt")
@@ -31,3 +38,4 @@ class SeoInfrastructureTests(TestCase):
         self.assertContains(response, "http://testserver/")
         self.assertContains(response, f"/category/{category.slug}/")
         self.assertContains(response, f"/p/{product.slug}/")
+        self.assertContains(response, "/children-parties/")

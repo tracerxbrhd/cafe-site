@@ -67,4 +67,5 @@ def cafe_settings(request):
     return {
         "cafe_settings": settings,
         "cafe_is_open_now": settings.is_currently_open() if settings else True,
+        "cafe_is_accepting_orders_now": settings.is_accepting_orders_now() if settings else True,
     }

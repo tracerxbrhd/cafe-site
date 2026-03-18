@@ -14,7 +14,7 @@ class CafeSettings(models.Model):
         "Текст режима работы",
         max_length=255,
         blank=True,
-        default="Ежедневно, 10:00–22:00",
+        default="Ежедневно, 10:00–21:00",
     )
 
     opening_time = models.TimeField(
@@ -23,7 +23,23 @@ class CafeSettings(models.Model):
     )
     closing_time = models.TimeField(
         "Время закрытия",
-        default=time(22, 0),
+        default=time(21, 0),
+    )
+
+    order_hours_text = models.CharField(
+        "Текст приема заказов",
+        max_length=255,
+        blank=True,
+        default="Ежедневно, 10:00–20:00",
+    )
+
+    order_opening_time = models.TimeField(
+        "Начало приема заказов",
+        default=time(10, 0),
+    )
+    order_closing_time = models.TimeField(
+        "Окончание приема заказов",
+        default=time(20, 0),
     )
 
     phone = models.CharField(
@@ -75,23 +91,34 @@ class CafeSettings(models.Model):
     def __str__(self):
         return "Настройки кафе"
 
+    def _is_within_time_range(self, start_time, end_time, dt=None) -> bool:
+        dt = dt or timezone.localtime()
+        now_time = dt.time()
+        if start_time == end_time:
+            return True
+
+        if start_time < end_time:
+            return start_time <= now_time < end_time
+
+        return now_time >= start_time or now_time < end_time
+
+    @property
+    def order_hours_display(self) -> str:
+        return self.order_hours_text or self.working_hours_text
+
     def is_currently_open(self, dt=None) -> bool:
         if not self.is_open:
             return False
+        return self._is_within_time_range(self.opening_time, self.closing_time, dt=dt)
 
-        dt = dt or timezone.localtime()
-        now_time = dt.time()
-
-        open_time = self.opening_time
-        close_time = self.closing_time
-
-        if open_time == close_time:
-            return True
-
-        if open_time < close_time:
-            return open_time <= now_time < close_time
-
-        return now_time >= open_time or now_time < close_time
+    def is_accepting_orders_now(self, dt=None) -> bool:
+        if not self.is_currently_open(dt=dt):
+            return False
+        return self._is_within_time_range(
+            self.order_opening_time,
+            self.order_closing_time,
+            dt=dt,
+        )
 
 
 class DeliveryZone(models.Model):
@@ -292,6 +319,7 @@ class ServicePage(models.Model):
     class PageType(models.TextChoices):
         BANQUETS = "banquets", "Банкеты"
         CATERING = "catering", "Кейтеринг"
+        CHILDREN_PARTIES = "children_parties", "Детские праздники"
 
     page_type = models.CharField(
         "Тип страницы",

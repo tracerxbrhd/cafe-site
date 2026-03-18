@@ -79,6 +79,12 @@
           <div id="delivery-zone-error" class="form-error" style="display:none;"></div>
         </div>
 
+        {% if delivery_zones_map %}
+          <div class="form-hint">
+            Зоны доставки уже отмечены на карте цветом. После выбора адреса нужная зона подсветится отдельно.
+          </div>
+        {% endif %}
+
         <div
           id="checkout-map"
           style="width:100%;height:360px;border:1px solid #ddd;border-radius:12px;overflow:hidden;background:#f3f3f3;"
@@ -167,6 +173,15 @@
       <div><span id="checkout-delivery-fee">{{ delivery_fee }}</span> ₽</div>
     </div>
 
+    <div
+      id="checkout-min-order-box"
+      class="notice-box"
+      style="margin-top:14px;display:block;"
+    >
+      <div><b>Минимальная сумма для оформления:</b> <span id="checkout-min-order">{{ cafe_settings.min_order_amount|default:0 }}</span> ₽</div>
+      <div id="checkout-min-order-message" class="muted" style="margin-top:6px;"></div>
+    </div>
+
     <div class="order-total-row">
       <div class="muted">Итого</div>
       <div style="font-size:24px;font-weight:700;"><span id="checkout-grand-total">{{ grand_total }}</span> ₽</div>
@@ -209,6 +224,7 @@
 {% if cafe_settings and cafe_settings.yandex_maps_api_key %}
   <script src="https://api-maps.yandex.ru/2.1/?apikey={{ cafe_settings.yandex_maps_api_key }}{% if cafe_settings.yandex_suggest_api_key %}&suggest_apikey={{ cafe_settings.yandex_suggest_api_key }}{% endif %}&lang=ru_RU"></script>
 {% endif %}
+{{ delivery_zones_map|json_script:"delivery-zones-data" }}
 
 <script>
 (function() {
@@ -231,6 +247,9 @@
   const promoCodeLabelEl = document.getElementById("promo-code-label");
   const promoFeedbackEl = document.getElementById("promo-feedback");
   const deliveryFeeEl = document.getElementById("checkout-delivery-fee");
+  const minOrderBoxEl = document.getElementById("checkout-min-order-box");
+  const minOrderEl = document.getElementById("checkout-min-order");
+  const minOrderMessageEl = document.getElementById("checkout-min-order-message");
   const grandTotalEl = document.getElementById("checkout-grand-total");
 
   const quoteBox = document.getElementById("delivery-quote-box");
@@ -245,12 +264,15 @@
   const promoUrl = "{% url 'orders:api_apply_promo' %}";
   const itemsTotalValue = Number("{{ items_total }}".replace(",", "."));
   const defaultMinOrder = Number("{{ cafe_settings.min_order_amount|default:0 }}".replace(",", "."));
+  const deliveryZonesDataEl = document.getElementById("delivery-zones-data");
   const initialPromoMessage = "{% if form.promo_code.errors %}{{ form.promo_code.errors|striptags|escapejs }}{% endif %}";
   const initialPromoHasError = {% if form.promo_code.errors %}true{% else %}false{% endif %};
+  const deliveryZones = deliveryZonesDataEl ? JSON.parse(deliveryZonesDataEl.textContent) : [];
 
   let mapInstance = null;
   let placemark = null;
   let suggestView = null;
+  let zonePolygons = [];
   let currentDeliveryFee = Number("{{ delivery_fee|default:0 }}".replace(",", "."));
   let currentPromoDiscount = Number("{{ promo_discount|default:0 }}".replace(",", "."));
   let appliedPromoCode = "{{ applied_promo_code|default:''|escapejs }}";
@@ -273,6 +295,31 @@
     deliveryFeeEl.textContent = fee.toFixed(2);
     if (promoDiscountEl) promoDiscountEl.textContent = discount.toFixed(2);
     grandTotalEl.textContent = grand.toFixed(2);
+    syncMinOrderHint();
+  }
+
+  function syncMinOrderHint() {
+    if (!minOrderBoxEl || !minOrderEl || !minOrderMessageEl) return;
+
+    const minOrder = Number.isFinite(currentMinOrderAmount) ? currentMinOrderAmount : 0;
+    const remainder = Math.max(0, minOrder - itemsTotalValue);
+
+    if (minOrder <= 0) {
+      minOrderBoxEl.style.display = "none";
+      return;
+    }
+
+    minOrderBoxEl.style.display = "block";
+    minOrderEl.textContent = minOrder.toFixed(2);
+
+    if (remainder > 0) {
+      minOrderMessageEl.textContent = `До минимальной суммы осталось ${remainder.toFixed(2)} ₽`;
+      minOrderMessageEl.className = "form-error";
+      return;
+    }
+
+    minOrderMessageEl.textContent = "Минимальная сумма достигнута.";
+    minOrderMessageEl.className = "form-hint";
   }
 
   function getSelectedPaymentMethod() {
@@ -425,6 +472,7 @@
 
       currentDeliveryFee = 0;
       currentMinOrderAmount = Number(data.min_order_amount || defaultMinOrder);
+      highlightZone("");
       syncTotals();
       return;
     }
@@ -437,7 +485,74 @@
 
     currentDeliveryFee = Number(String(data.delivery_fee || "0").replace(",", "."));
     currentMinOrderAmount = Number(String(data.min_order_amount || defaultMinOrder).replace(",", "."));
+    highlightZone(data.zone_code || "");
     syncTotals();
+  }
+
+  function zoneStyle(index, isActive) {
+    const palette = [
+      {
+        fill: "rgba(2, 132, 199, 0.16)",
+        stroke: "#0369a1",
+      },
+      {
+        fill: "rgba(5, 150, 105, 0.16)",
+        stroke: "#047857",
+      },
+      {
+        fill: "rgba(217, 119, 6, 0.16)",
+        stroke: "#b45309",
+      },
+    ];
+
+    const base = palette[index % palette.length];
+    if (isActive) {
+      return {
+        fillColor: base.fill.replace("0.16", "0.24"),
+        strokeColor: base.stroke,
+        strokeWidth: 4,
+      };
+    }
+
+    return {
+      fillColor: base.fill,
+      strokeColor: base.stroke,
+      strokeWidth: 2,
+    };
+  }
+
+  function renderDeliveryZones() {
+    if (!mapInstance || !window.ymaps || !deliveryZones.length) return;
+
+    zonePolygons = deliveryZones.map((zone, index) => {
+      const polygon = new ymaps.Polygon(
+        [zone.coordinates],
+        {
+          hintContent: `${zone.name}: доставка ${zone.delivery_fee} ₽, минимум ${zone.min_order_amount} ₽`,
+        },
+        Object.assign(
+          {
+            interactivityModel: "default#transparent",
+          },
+          zoneStyle(index, false)
+        )
+      );
+
+      mapInstance.geoObjects.add(polygon);
+      return {
+        code: zone.code,
+        index: index,
+        polygon: polygon,
+      };
+    });
+  }
+
+  function highlightZone(zoneCode) {
+    zonePolygons.forEach((entry) => {
+      entry.polygon.options.set(
+        zoneStyle(entry.index, Boolean(zoneCode) && entry.code === zoneCode)
+      );
+    });
   }
 
   async function updateQuoteByCoords(lat, lon) {
@@ -489,6 +604,8 @@
         zoom: 11,
         controls: ["zoomControl", "fullscreenControl"],
       });
+
+      renderDeliveryZones();
 
       placemark = new ymaps.Placemark(initialCenter, {}, {
         preset: "islands#redDotIcon",
@@ -586,10 +703,16 @@
   if (fulfillmentField) {
     fulfillmentField.addEventListener("change", syncDeliveryFields);
     fulfillmentField.addEventListener("change", function() {
+      if (fulfillmentField.value !== "delivery") {
+        currentDeliveryFee = 0;
+        currentMinOrderAmount = defaultMinOrder;
+        highlightZone("");
+      }
+
       syncTotals();
       const lat = parseFloat(latInput.value || "");
       const lon = parseFloat(lonInput.value || "");
-      if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+      if (fulfillmentField.value === "delivery" && !Number.isNaN(lat) && !Number.isNaN(lon)) {
         updateQuoteByCoords(lat, lon);
       }
     });

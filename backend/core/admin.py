@@ -15,9 +15,58 @@ class CafeSettingsAdmin(admin.ModelAdmin):
         "is_open",
         "phone",
         "working_hours_text",
+        "order_hours_text",
         "min_order_amount",
         "delivery_fee",
         "updated_at",
+    )
+    fieldsets = (
+        (
+            "Статус и уведомления",
+            {
+                "fields": (
+                    "is_open",
+                    "site_notice",
+                )
+            },
+        ),
+        (
+            "Часы работы кафе",
+            {
+                "fields": (
+                    "working_hours_text",
+                    ("opening_time", "closing_time"),
+                )
+            },
+        ),
+        (
+            "Прием заказов",
+            {
+                "fields": (
+                    "order_hours_text",
+                    ("order_opening_time", "order_closing_time"),
+                )
+            },
+        ),
+        (
+            "Контакты и доставка",
+            {
+                "fields": (
+                    "phone",
+                    "address_text",
+                    ("min_order_amount", "delivery_fee"),
+                )
+            },
+        ),
+        (
+            "Yandex Maps",
+            {
+                "fields": (
+                    "yandex_maps_api_key",
+                    "yandex_suggest_api_key",
+                )
+            },
+        ),
     )
 
     def has_add_permission(self, request):

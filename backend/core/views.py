@@ -46,6 +46,15 @@ def catering_page(request):
     return render(request, "core/service_page.html", {"page": page, "page_kind": "catering"})
 
 
+def children_parties_page(request):
+    page = get_service_page(ServicePage.PageType.CHILDREN_PARTIES)
+    return render(
+        request,
+        "core/service_page.html",
+        {"page": page, "page_kind": "children_parties"},
+    )
+
+
 def robots_txt(request):
     origin = settings.SITE_URL.rstrip("/") if settings.SITE_URL else request.build_absolute_uri("/").rstrip("/")
     sitemap_url = f"{origin}{reverse('sitemap')}"

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% load dicts %}
 {% block title %}Кафе «Сказка» — доставка еды, бизнес-ланчи и банкеты в Ижевске{% endblock %}
-{% block meta_description %}Кафе «Сказка» в Ижевске: доставка еды, актуальные бизнес-ланчи, банкеты и кейтеринг. Выберите блюда из меню и оформите заказ онлайн.{% endblock %}
+{% block meta_description %}Кафе «Сказка» в Ижевске: доставка еды, актуальные бизнес-ланчи, банкеты, кейтеринг и детские праздники. Выберите блюда из меню и оформите заказ онлайн.{% endblock %}
 {% block og_title %}Кафе «Сказка» — доставка еды в Ижевске{% endblock %}
-{% block og_description %}Доставка еды, бизнес-ланчи, банкеты и кейтеринг от кафе «Сказка» в Ижевске.{% endblock %}
+{% block og_description %}Доставка еды, бизнес-ланчи, банкеты, кейтеринг и детские праздники от кафе «Сказка» в Ижевске.{% endblock %}
 {% block twitter_title %}Кафе «Сказка» — доставка еды в Ижевске{% endblock %}
-{% block twitter_description %}Доставка еды, бизнес-ланчи, банкеты и кейтеринг от кафе «Сказка» в Ижевске.{% endblock %}
+{% block twitter_description %}Доставка еды, бизнес-ланчи, банкеты, кейтеринг и детские праздники от кафе «Сказка» в Ижевске.{% endblock %}
 
 {% block hero_full %}
 <section class="hero-full">
@@ -265,56 +265,45 @@
 
 {% block content %}
 <section style="margin-bottom:40px;">
-  <h2 class="section-title">Дополнительные направления</h2>
+  <div class="panel" style="display:grid;gap:18px;">
+    <div style="display:flex;align-items:end;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+      <div>
+        <h2 class="section-title" style="margin-bottom:8px;">Бизнес-ланчи</h2>
+        <div class="muted">Ежедневные комплексные предложения, которые удобно взять на обед или заказать заранее.</div>
+      </div>
+      <a href="{% url 'core:business_lunches' %}" class="btn">Смотреть все бизнес-ланчи</a>
+    </div>
 
-  <div class="teaser-grid">
-    <article class="teaser-card">
-      <div style="font-size:24px;font-weight:800;">Бизнес-ланчи</div>
-
-      {% if current_business_lunch_day %}
-        <div class="muted" style="line-height:1.55;">
-          Актуальное предложение:
-          <b>{{ current_business_lunch_day.title }}</b><br>
-          Дата: {{ current_business_lunch_day.service_date }}
+    {% if current_business_lunch_day %}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:18px;">
+        <div style="display:grid;gap:10px;">
+          <div style="font-size:28px;font-weight:800;line-height:1.15;">{{ current_business_lunch_day.title }}</div>
+          <div class="muted" style="line-height:1.65;">
+            Актуальный бизнес-ланч на {{ current_business_lunch_day.service_date }}.
+            Состав обновляется по дням, а предложение заранее собирается на неделю.
+          </div>
+          <div style="display:grid;gap:8px;">
+            {% for item in current_business_lunch_day.items.all|slice:":4" %}
+              <div>• {% if item.role %}{{ item.role }}: {% endif %}{{ item.product.name }}</div>
+            {% endfor %}
+          </div>
         </div>
 
-        <div style="display:grid;gap:6px;font-size:14px;">
-          {% for item in current_business_lunch_day.items.all|slice:":3" %}
-            <div>
-              • {% if item.role %}{{ item.role }}: {% endif %}{{ item.product.name }}
-            </div>
-          {% endfor %}
+        <div class="panel" style="background:#fcfcfc;">
+          <div class="muted" style="font-size:13px;margin-bottom:8px;">Стоимость</div>
+          <div style="font-size:30px;font-weight:800;line-height:1.1;margin-bottom:10px;">{{ current_business_lunch_day.price }} ₽</div>
+          <div class="muted" style="line-height:1.6;margin-bottom:16px;">
+            Нажмите, чтобы посмотреть состав на неделю и быстро добавить бизнес-ланч в корзину.
+          </div>
+          <a href="{% url 'core:business_lunches' %}" class="btn btn-primary">Открыть раздел</a>
         </div>
-      {% else %}
-        <div class="muted" style="line-height:1.55;">
-          Фиксированные предложения, которые обновляются по дням и планируются на неделю вперёд.
-        </div>
-      {% endif %}
-
-      <div style="margin-top:auto;">
-        <a href="{% url 'core:business_lunches' %}" class="btn">Подробнее</a>
       </div>
-    </article>
-
-    <article class="teaser-card">
-      <div style="font-size:24px;font-weight:800;">Банкеты</div>
-      <div class="muted" style="line-height:1.55;">
-        Информация о проведении банкетов, форматах обслуживания и возможностях организации мероприятий.
+    {% else %}
+      <div class="muted" style="line-height:1.65;">
+        Фиксированные предложения обновляются по дням и планируются на неделю вперёд.
+        Как только ланч на сегодня опубликован, он появится здесь.
       </div>
-      <div style="margin-top:auto;">
-        <a href="{% url 'core:banquets' %}" class="btn">Подробнее</a>
-      </div>
-    </article>
-
-    <article class="teaser-card">
-      <div style="font-size:24px;font-weight:800;">Выездной кейтеринг</div>
-      <div class="muted" style="line-height:1.55;">
-        Обслуживание мероприятий вне площадки кафе: корпоративы, встречи, праздники и другие выездные форматы.
-      </div>
-      <div style="margin-top:auto;">
-        <a href="{% url 'core:catering' %}" class="btn">Подробнее</a>
-      </div>
-    </article>
+    {% endif %}
   </div>
 </section>
 
@@ -448,6 +437,42 @@
 </section>
 
 <section style="margin-top:48px;">
+  <h2 class="section-title">Дополнительные направления</h2>
+
+  <div class="teaser-grid">
+    <article class="teaser-card">
+      <div style="font-size:24px;font-weight:800;">Банкеты</div>
+      <div class="muted" style="line-height:1.55;">
+        Проведение семейных и корпоративных мероприятий, подбор формата обслуживания и помощь в организации события.
+      </div>
+      <div style="margin-top:auto;">
+        <a href="{% url 'core:banquets' %}" class="btn">Подробнее</a>
+      </div>
+    </article>
+
+    <article class="teaser-card">
+      <div style="font-size:24px;font-weight:800;">Выездной кейтеринг</div>
+      <div class="muted" style="line-height:1.55;">
+        Обслуживание мероприятий вне площадки кафе: корпоративы, встречи, праздники и другие выездные форматы.
+      </div>
+      <div style="margin-top:auto;">
+        <a href="{% url 'core:catering' %}" class="btn">Подробнее</a>
+      </div>
+    </article>
+
+    <article class="teaser-card">
+      <div style="font-size:24px;font-weight:800;">Детские праздники</div>
+      <div class="muted" style="line-height:1.55;">
+        Праздничные программы с аниматорами, дни рождения и семейные мероприятия для детей.
+      </div>
+      <div style="margin-top:auto;">
+        <a href="{% url 'core:children_parties' %}" class="btn">Подробнее</a>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section style="margin-top:48px;">
   <div class="contact-map-grid">
     <div class="panel contact-map-card">
       <h2 class="section-title" style="font-size:28px;margin-bottom:14px;">Как нас найти</h2>
@@ -455,17 +480,59 @@
       <div style="display:grid;gap:14px;line-height:1.6;">
         <div>
           <div class="muted" style="font-size:13px;">Локация</div>
-          <div><b>г. Ижевск, кафе «Сказка»</b></div>
+          <div>
+            <b>
+              {% if cafe_settings and cafe_settings.address_text %}
+                {{ cafe_settings.address_text }}
+              {% else %}
+                г. Ижевск, кафе «Сказка»
+              {% endif %}
+            </b>
+          </div>
         </div>
 
         <div>
           <div class="muted" style="font-size:13px;">Телефон</div>
-          <div><b><a href="tel:+70000000000" style="text-decoration:none;">+7 (000) 000-00-00</a></b></div>
+          <div>
+            <b>
+              <a
+                href="tel:{% if cafe_settings and cafe_settings.phone %}{{ cafe_settings.phone|cut:' '|cut:'('|cut:')'|cut:'-' }}{% else %}+70000000000{% endif %}"
+                style="text-decoration:none;"
+              >
+                {% if cafe_settings and cafe_settings.phone %}
+                  {{ cafe_settings.phone }}
+                {% else %}
+                  +7 (000) 000-00-00
+                {% endif %}
+              </a>
+            </b>
+          </div>
         </div>
 
         <div>
           <div class="muted" style="font-size:13px;">Режим работы</div>
-          <div><b>Ежедневно, 10:00–22:00</b></div>
+          <div>
+            <b>
+              {% if cafe_settings and cafe_settings.working_hours_text %}
+                {{ cafe_settings.working_hours_text }}
+              {% else %}
+                Ежедневно, 10:00–21:00
+              {% endif %}
+            </b>
+          </div>
+        </div>
+
+        <div>
+          <div class="muted" style="font-size:13px;">Приём заказов</div>
+          <div>
+            <b>
+              {% if cafe_settings and cafe_settings.order_hours_display %}
+                {{ cafe_settings.order_hours_display }}
+              {% else %}
+                Ежедневно, 10:00–20:00
+              {% endif %}
+            </b>
+          </div>
         </div>
 
         <div>
@@ -495,7 +562,7 @@
           </a>
 
           <a
-            href="tel:+70000000000"
+            href="tel:{% if cafe_settings and cafe_settings.phone %}{{ cafe_settings.phone|cut:' '|cut:'('|cut:')'|cut:'-' }}{% else %}+70000000000{% endif %}"
             class="btn"
           >
             Позвонить

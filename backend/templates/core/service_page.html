@@ -9,7 +9,7 @@
   {% elif page and page.content %}
     {{ page.content|striptags|truncatechars:160 }}
   {% else %}
-    Услуги кафе «Сказка» в Ижевске: банкеты, кейтеринг и организация питания.
+    Услуги кафе «Сказка» в Ижевске: банкеты, кейтеринг и детские праздники.
   {% endif %}
 {% endblock %}
 {% block og_title %}
@@ -21,7 +21,7 @@
   {% elif page and page.content %}
     {{ page.content|striptags|truncatechars:160 }}
   {% else %}
-    Услуги кафе «Сказка» в Ижевске: банкеты, кейтеринг и организация питания.
+    Услуги кафе «Сказка» в Ижевске: банкеты, кейтеринг и детские праздники.
   {% endif %}
 {% endblock %}
 {% block twitter_title %}
@@ -33,7 +33,7 @@
   {% elif page and page.content %}
     {{ page.content|striptags|truncatechars:160 }}
   {% else %}
-    Услуги кафе «Сказка» в Ижевске: банкеты, кейтеринг и организация питания.
+    Услуги кафе «Сказка» в Ижевске: банкеты, кейтеринг и детские праздники.
   {% endif %}
 {% endblock %}
 
@@ -98,7 +98,13 @@
   {% else %}
     <div class="panel">
       <h1 class="section-title">
-        {% if page_kind == "banquets" %}Банкеты{% else %}Выездной кейтеринг{% endif %}
+        {% if page_kind == "banquets" %}
+          Банкеты
+        {% elif page_kind == "catering" %}
+          Выездной кейтеринг
+        {% else %}
+          Детские праздники
+        {% endif %}
       </h1>
       <div class="muted">
         Страница пока не заполнена в админке.
